@@ -4,7 +4,7 @@ import { PrismaService } from './prisma/prisma.service';
 @Injectable()
 export class AppService {
   constructor(private prismaService: PrismaService) {}
-  getHello() {
-    return this.prismaService.user.findMany();
+  async getHello() {
+    return await this.prismaService.user.findMany();
   }
 }
