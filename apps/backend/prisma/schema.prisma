@@ -37,6 +37,13 @@ enum SkillStatus {
   @@map("skill_status_enum")
 }
 
+enum UserRoles {
+  user
+  admin
+
+  @@map("user_roles_enum")
+}
+
 enum SkillLevel {
   beginner
   intermediate
@@ -140,6 +147,7 @@ model User {
   passwordHash        String    @db.VarChar(60) /// Hash bcrypt coût 12 — jamais le mot de passe en clair
   firstName           String    @db.VarChar(50)
   lastName            String    @db.VarChar(50)
+  role                UserRoles @default(user)
   city                String?   @db.VarChar(100)
   bio                 String?   @db.VarChar(280)
   avatarUrl           String?   @db.VarChar(500)
@@ -222,7 +230,7 @@ model UserSkill {
   updatedAt      DateTime   @updatedAt @db.Timestamptz()
 
   // Relations
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade) 
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   skillCatalog SkillCatalog @relation(fields: [skillCatalogId], references: [id], onDelete: Restrict)
 
   /// Un user ne peut pas ajouter deux fois la même compétence du même type
@@ -243,7 +251,7 @@ model Match {
   id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userAId      String      @db.Uuid /// Toujours l'UUID le plus petit des deux — garantit l'unicité canonique
   userBId      String      @db.Uuid
-  type         MatchType   // zakariae : perfect / partial
+  type         MatchType // zakariae : perfect / partial
   /// Score de compatibilité 0-100
   score        Int
   /// 'Très compatible' | 'Compatible' | 'Partiellement compatible'
