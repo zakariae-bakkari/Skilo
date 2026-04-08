@@ -10,13 +10,14 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequestWithUser } from '../auth/types/request-with-user.type';
 import { UsersService } from './users.service';
+import { JwtGuard } from 'src/auth/guards/jwt.guard';
 
-@UseGuards(JwtAuthGuard) // Toutes les routes protégées
+@UseGuards(JwtGuard) // Toutes les routes protégées
 @Controller('users')
 export class UsersController {
   constructor(private users: UsersService) {}
@@ -29,8 +30,8 @@ export class UsersController {
 
   // GET /users/me → profil complet de l'utilisateur connecté
   @Get('me')
-  getMe(@CurrentUser() user: { id: string }) {
-    return this.users.findMe(user.id);
+  getMe(@Req() req: RequestWithUser) {
+    return this.users.findMe(req.user.sub);
   }
 
   // GET /users/:id → profil public d'un autre utilisateur
@@ -41,14 +42,14 @@ export class UsersController {
 
   // PATCH /users/me → mise à jour du profil
   @Patch('me')
-  updateMe(@CurrentUser() user: { id: string }, @Body() dto: UpdateUserDto) {
-    return this.users.updateMe(user.id, dto);
+  updateMe(@Req() req: RequestWithUser, @Body() dto: UpdateUserDto) {
+    return this.users.updateMe(req.user.sub, dto);
   }
 
   // DELETE /users/me → soft delete (isActive = false)
   @Delete('me')
   @HttpCode(HttpStatus.OK)
-  deleteMe(@CurrentUser() user: { id: string }) {
-    return this.users.deleteMe(user.id);
+  deleteMe(@Req() req: RequestWithUser) {
+    return this.users.deleteMe(req.user.sub);
   }
 }

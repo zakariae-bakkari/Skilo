@@ -1,45 +1,34 @@
-// auth/guards/roles.guard.ts
 import {
-  Injectable,
   CanActivate,
   ExecutionContext,
+  Injectable,
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Role, ROLES_KEY } from '../decorators/roles.decorator';
+import { ROLES_KEY } from '../decorators/roles.decorator';
+import { Role } from '../enums/role.enum';
+import { RequestWithUser } from '../types/request-with-user.type';
 
-/**
- * RolesGuard — vérifie que l'utilisateur a le rôle requis.
- * Doit être utilisé APRÈS JwtAuthGuard (req.user doit être populé).
- *
- * Usage dans le module ou sur le controller :
- *   @UseGuards(JwtAuthGuard, RolesGuard)
- *   @Roles(Role.Admin)
- *
- * Note : si votre modèle User n'a pas de champ `role` encore,
- * ajoutez `role String @default("user")` dans le schema Prisma.
- */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
+    // get the roles required by the route
     const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    // Pas de @Roles() sur la route → accès libre (guard passthrough)
-    if (!requiredRoles || requiredRoles.length === 0) return true;
+    // no @Roles() decorator = route is open to any authenticated user
+    if (!requiredRoles) return true;
 
-    const request = context
-      .switchToHttp()
-      .getRequest<{ user: { role: Role } }>();
-    const { user } = request;
+    const request = context.switchToHttp().getRequest<RequestWithUser>();
+    const user = request.user;
 
-    const hasRole = requiredRoles.some((role) => user?.role === role);
-    if (!hasRole) {
-      throw new ForbiddenException('Accès refusé : rôle insuffisant');
+    //  if (!requiredRoles.includes(user.role)) {
+    if (requiredRoles.length > 0) {
+      throw new ForbiddenException('You do not have permission');
     }
 
     return true;
