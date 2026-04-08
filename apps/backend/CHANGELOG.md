@@ -1,10 +1,25 @@
 # 📦 Changelog - Refresh Token & Logout Implementation
 
 **Date:** 2026-04-08  
-**Version:** 1.0.0  
+**Version:** 1.0.1  
 **Author:** Copilot + Zakariae
 
 ---
+
+## [1.0.1] - 2026-04-08 - Type Fixes
+
+### 🔧 Fixed
+- **auth.controller.ts**: Eliminated `as any` casts, added proper `RequestWithCookies` interface
+- **auth.service.ts**: Changed parameter types to `string | undefined` for optional cookies
+- **auth.service.ts**: Added null checks with optional chaining for decoded tokens
+- **auth.service.ts**: Replaced `as any` with explicit types
+
+### 📚 Documentation
+- Added `TYPE-FIXES.md` - Complete guide to type safety improvements
+
+---
+
+## [1.0.0] - 2026-04-08 - Initial Implementation
 
 ## 📄 Fichiers de Documentation Créés
 

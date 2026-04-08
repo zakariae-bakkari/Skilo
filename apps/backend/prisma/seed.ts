@@ -329,7 +329,6 @@ async function main() {
       lastName: 'Idrissi',
       city: 'Fès',
       isOnboarded: false,
-      onboardingStep: 2,
       creditBalance: 2, // welcome_bonus
     },
   });

@@ -8,7 +8,6 @@ export interface AuthUser {
   city: string | null;
   avatarUrl: string | null;
   isOnboarded: boolean;
-  onboardingStep: number;
   creditBalance: number;
   profileScore: number;
   createdAt: string;

@@ -1,6 +1,6 @@
 ### Variables
 @baseUrl = http://localhost:2006
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhNzYwNGE0OS01MWYzLTRiOTMtYTY0NC00M2Q1N2Q3N2I1Y2EiLCJlbWFpbCI6ImpvaG4uZG9lQGV4YW1wbGUuY29tIiwiZmlyc3ROYW1lIjoiSm9obiIsImxhc3ROYW1lIjoiRG9lIiwiaWF0IjoxNzc1NjMxNjY3LCJleHAiOjE3NzU2MzUyNjd9.IpJTjbvN0_lPocS47L_bQI-Xba_AgloDnWzZ29iXCU0
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiZjBkM2YzZi01ZjBiLTQ5NmQtODQ1YS0wMmNiOThmMWQxMWQiLCJlbWFpbCI6Im1lcmllbXRpQGV4YW1wbGUuY29tIiwiZmlyc3ROYW1lIjoiSm9obiIsImxhc3ROYW1lIjoiRG9lIiwiaWF0IjoxNzc1NjU3ODc1LCJleHAiOjE3NzU2NTg3NzV9.HUeViWGO19B24AGwPwY0o61zW8eGLvfbAd-spfvfb-Y
 
 ### ─────────────────────────────────────────────────────────────
 ### Register a new user
@@ -8,7 +8,7 @@ POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "email": "test@example.com",
+  "email": "meriemti@example.com",
   "password": "Password123",
   "firstName": "John",
   "lastName": "Doe"
@@ -23,6 +23,14 @@ Content-Type: application/json
   "email": "john.doe@example.com",
   "password": "Password123"
 }
+
+### ─────────────────────────────────────────────────────────────
+### Refresh access token (uses refresh_token cookie automatically)
+POST {{baseUrl}}/auth/refresh
+
+### ─────────────────────────────────────────────────────────────
+### Logout (revokes refresh_token)
+POST {{baseUrl}}/auth/logout
 
 ### ─────────────────────────────────────────────────────────────
 ### Get current user profile (protected route)

@@ -18,6 +18,10 @@ async function bootstrap() {
     throw new Error('JWT_SECRET is not defined');
   }
 
+  if (!process.env.JWT_REFRESH_SECRET) {
+    throw new Error('JWT_REFRESH_SECRET is not defined');
+  }
+
   app.enableCors({
     origin: process.env.FRONTEND_URL, // URL de ton frontend
     credentials: true,

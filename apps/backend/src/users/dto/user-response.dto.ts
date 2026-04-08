@@ -19,7 +19,6 @@ export class UserResponseDto {
   avgCommunication: number | null;
   sessionsCompleted: number;
   hasBadgeFiable: boolean;
-  onboardingStep: number;
   createdAt: Date;
 
   constructor(user: User) {
@@ -43,7 +42,6 @@ export class UserResponseDto {
       : null;
     this.sessionsCompleted = user.sessionsCompleted;
     this.hasBadgeFiable = user.hasBadgeFiable;
-    this.onboardingStep = user.onboardingStep;
     this.createdAt = user.createdAt;
   }
 }

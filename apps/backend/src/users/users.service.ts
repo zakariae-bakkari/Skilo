@@ -25,7 +25,6 @@ const PUBLIC_SELECT = {
   avgCommunication: true,
   sessionsCompleted: true,
   hasBadgeFiable: true,
-  onboardingStep: true,
   createdAt: true,
 };
 
@@ -114,7 +113,6 @@ export class UsersService {
       data: {
         isActive: false,
         email: `deleted_${id}@deleted.local`, // Libère l'unicité de l'email
-        emailLower: null,
         updatedAt: new Date(),
       },
     });

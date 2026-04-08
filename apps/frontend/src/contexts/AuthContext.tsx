@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Redirection selon état d'onboarding
         if (!user.isOnboarded) {
-          router.push(`/onboarding/step-${user.onboardingStep}`);
+          router.push(`/onboarding/step-1`);
         } else {
           router.push('/dashboard');
         }

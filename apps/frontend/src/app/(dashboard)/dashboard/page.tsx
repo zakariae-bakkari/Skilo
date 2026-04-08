@@ -90,13 +90,13 @@ export default function DashboardPage() {
                 <span className="text-green-600 ml-2">✓ Terminé</span>
               ) : (
                 <span className="text-orange-600 ml-2">
-                  En cours (Étape {user.onboardingStep})
+                  En cours (Étape 1)
                 </span>
               )}
             </p>
             {!user.isOnboarded && (
               <a
-                href={`/onboarding/step-${user.onboardingStep}`}
+                href={`/onboarding/step-1`}
                 className="inline-block mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Continuer l&apos;onboarding
