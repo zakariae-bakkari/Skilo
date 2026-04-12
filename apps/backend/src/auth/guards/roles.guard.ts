@@ -14,20 +14,20 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // get the roles required by the route
     const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    // no @Roles() decorator = route is open to any authenticated user
-    if (!requiredRoles) return true;
+    // No @Roles() decorator = any authenticated user can access
+    if (!requiredRoles || requiredRoles.length === 0) return true;
 
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const user = request.user;
 
-    //  if (!requiredRoles.includes(user.role)) {
-    if (requiredRoles.length > 0) {
+    // BUG FIX: was "if (requiredRoles.length > 0) throw" — always blocked everyone
+    // Correct: block only if the user's role is NOT in the required list
+    if (!requiredRoles.includes(user.role)) {
       throw new ForbiddenException('You do not have permission');
     }
 

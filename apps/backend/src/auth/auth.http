@@ -1,6 +1,6 @@
 ### Variables
 @baseUrl = http://localhost:2006
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiZjBkM2YzZi01ZjBiLTQ5NmQtODQ1YS0wMmNiOThmMWQxMWQiLCJlbWFpbCI6Im1lcmllbXRpQGV4YW1wbGUuY29tIiwiZmlyc3ROYW1lIjoiSm9obiIsImxhc3ROYW1lIjoiRG9lIiwiaWF0IjoxNzc1NjU3ODc1LCJleHAiOjE3NzU2NTg3NzV9.HUeViWGO19B24AGwPwY0o61zW8eGLvfbAd-spfvfb-Y
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhNzYwNGE0OS01MWYzLTRiOTMtYTY0NC00M2Q1N2Q3N2I1Y2EiLCJlbWFpbCI6ImpvaG4uZG9lQGV4YW1wbGUuY29tIiwiZmlyc3ROYW1lIjoiSm9obiIsImxhc3ROYW1lIjoiRG9lIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NzU5NTkyNDMsImV4cCI6MTc3NTk2MDE0M30.nJ14qKeHAaGOpTXulnogmy8U402p0Az_9U4OPCZFyqs
 
 ### ─────────────────────────────────────────────────────────────
 ### Register a new user
@@ -20,8 +20,8 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "john.doe@example.com",
-  "password": "Password123"
+  "email": "meriem@skilo.app",
+  "password": "Password123!"
 }
 
 ### ─────────────────────────────────────────────────────────────
@@ -61,6 +61,11 @@ Content-Type: application/json
   "firstName": "Jane",
   "lastName": "Smith"
 }
+###
+
+GET {{baseUrl}}/auth/admin
+Content-Type: application/json 
+Authorization: Bearer {{token}}
 
 ### ─────────────────────────────────────────────────────────────
 ### Register - Test email already exists

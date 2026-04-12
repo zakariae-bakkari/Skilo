@@ -1,0 +1,205 @@
+### Variables
+@baseUrl = http://localhost:2006
+# Update this token after logging in
+@token = YOUR_ACCESS_TOKEN_HERE
+@userId = '0031d8aa-d265-47f8-a7f1-f026456ca582'
+
+@matchId = '33000000-0000-0000-0000-000000000001'
+@sessionId =''
+@skillId =''
+@notificationId = ''
+
+### ─────────────────────────────────────────────────────────────
+### 🔐 AUTHENTICATION & ONBOARDING
+### ─────────────────────────────────────────────────────────────
+
+# Register a new user
+# @response { "access_token": "..." }
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "Password123",
+  "firstName": "Test",
+  "lastName": "User"
+}
+
+# Login
+# @response { "access_token": "..." }
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "Password123"
+}
+
+# Refresh Token (Uses httpOnly cookie)
+POST {{baseUrl}}/auth/refresh
+
+# Logout
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{token}}
+
+# Get Current User
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### ─────────────────────────────────────────────────────────────
+### 👤 USER PROFILES & SKILLS
+### ─────────────────────────────────────────────────────────────
+
+# Get own full profile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+
+# Update own profile
+PATCH {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "city": "Paris",
+  "bio": "Passionate about coding and languages",
+  "avatarUrl": "https://example.com/avatar.jpg"
+}
+
+# Get a public profile
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+
+# Search skills (Autocomplete)
+GET {{baseUrl}}/skills/search?q=java
+Authorization: Bearer {{token}}
+
+# Create a new skill (pending review)
+POST {{baseUrl}}/skills
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "TypeScript",
+  "category": "tech"
+}
+
+### ─────────────────────────────────────────────────────────────
+### 🤝 MATCHING ALGORITHM
+### ─────────────────────────────────────────────────────────────
+
+# Get my matches (Paginated & Filtered)
+# Filters: type (perfect|partial), category, level, sort (score|rating|sessions)
+GET {{baseUrl}}/matches?type=perfect&sort=score&page=1&limit=10
+Authorization: Bearer {{token}}
+
+# Get specific match detail
+GET {{baseUrl}}/matches/{{matchId}}
+Authorization: Bearer {{token}}
+
+# Manually trigger recalculation for current user
+POST {{baseUrl}}/matches/recalculate
+Authorization: Bearer {{token}}
+
+### ─────────────────────────────────────────────────────────────
+### 📅 SESSIONS MANAGEMENT
+### ─────────────────────────────────────────────────────────────
+
+# Propose a session
+POST {{baseUrl}}/sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "recipientId": "{{userId}}",
+  "scheduledAt": "2026-05-01T14:00:00Z",
+  "durationMinutes": 60,
+  "offeredSkillId": "{{skillId}}",
+  "wantedSkillId": "{{skillId}}",
+  "message": "Hello! I'd love to exchange skills with you.",
+  "meetingLink": "https://meet.google.com/abc-defg-hij"
+}
+
+# Accept a session (Recipient)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/accept
+Authorization: Bearer {{token}}
+
+# Decline a session (Recipient)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/decline
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "reason": "I am not available at this time."
+}
+
+# Cancel a session (Initiator or Recipient)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/cancel
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "reason": "Emergency came up."
+}
+
+# Confirm session happened (Both must call this)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/confirm
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "didHappen": true
+}
+
+# Get my sessions (Upcoming vs Past)
+GET {{baseUrl}}/sessions?tab=upcoming&page=1&limit=20
+Authorization: Bearer {{token}}
+
+### ─────────────────────────────────────────────────────────────
+### 💳 TIME CREDITS SYSTEM
+### ─────────────────────────────────────────────────────────────
+
+# Get current credit balance & reserved
+GET {{baseUrl}}/credits/balance
+Authorization: Bearer {{token}}
+
+# Get credit transaction history
+GET {{baseUrl}}/credits/history?type=session_earned&page=1&limit=20
+Authorization: Bearer {{token}}
+
+### ─────────────────────────────────────────────────────────────
+### ⭐ EVALUATIONS & BADGES
+### ─────────────────────────────────────────────────────────────
+
+# Submit a review after a session
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sessionId": "{{sessionId}}",
+  "globalRating": 5,
+  "pedagogyRating": 4,
+  "punctualityRating": 5,
+  "communicationRating": 5,
+  "comment": "Excellent session! Very clear explanations."
+}
+
+# Get all public reviews for a user
+GET {{baseUrl}}/reviews/user/{{userId}}
+Authorization: Bearer {{token}}
+
+### ─────────────────────────────────────────────────────────────
+### 🔔 NOTIFICATIONS
+### ─────────────────────────────────────────────────────────────
+
+# Get my notifications
+GET {{baseUrl}}/notifications?page=1&limit=20
+Authorization: Bearer {{token}}
+
+# Mark a specific notification as read
+PATCH {{baseUrl}}/notifications/{{notificationId}}/read
+Authorization: Bearer {{token}}
+
+# Mark all notifications as read
+PATCH {{baseUrl}}/notifications/read-all
+Authorization: Bearer {{token}}
