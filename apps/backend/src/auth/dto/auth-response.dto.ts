@@ -1,3 +1,5 @@
+import { Role } from '../enums/role.enum';
+
 export class AuthResponseDto {
   access_token: string;
   refresh_token: string;
@@ -6,5 +8,6 @@ export class AuthResponseDto {
     email: string;
     firstName: string;
     lastName: string;
+    role: Role;
   };
 }

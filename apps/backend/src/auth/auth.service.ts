@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -15,6 +16,10 @@ import { JwtPayload } from './types/jwt-payload.type';
 import { User } from 'generated/prisma/client';
 import { Role } from './enums/role.enum';
 
+const BCRYPT_COST = 12; // spec FC-01-A
+const MAX_ATTEMPTS = 5;
+const BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -23,54 +28,97 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<AuthResponseDto> {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-    if (existing) throw new ConflictException('Email already in use');
+  // ─── Register ─────────────────────────────────────────────────────────────
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+  async register(dto: RegisterDto): Promise<AuthResponseDto> {
+    // Case-insensitive uniqueness check
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email.toLowerCase() },
+    });
+    if (existing) {
+      throw new ConflictException(
+        'Cette adresse email est déjà associée à un compte.',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST);
 
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email,
+        email: dto.email.toLowerCase(),
         passwordHash,
         firstName: dto.firstName,
         lastName: dto.lastName,
+        // creditBalance defaults to 2 in schema (welcome bonus — FC-06-A)
       },
     });
 
     return this.buildResponse(user);
   }
 
+  // ─── Login ────────────────────────────────────────────────────────────────
+
   async login(dto: LoginDto): Promise<AuthResponseDto> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    const email = dto.email.toLowerCase();
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    // Brute-force check (FC-01-B) — runs before password comparison.
+    // If the user doesn't exist we skip it (nothing to lock) and fall through
+    // to the generic 401 below — never revealing whether the email exists.
+    if (user) {
+      this.assertNotLocked(user);
+    }
+
+    if (!user) {
+      // Generic message — never confirm whether the email exists
+      throw new UnauthorizedException('Email ou mot de passe incorrect.');
+    }
 
     const passwordMatch = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
+
+    if (!passwordMatch) {
+      await this.recordFailedAttempt(user);
+      throw new UnauthorizedException('Email ou mot de passe incorrect.');
+    }
+
+    // Disabled account check (FC-01-B)
+    if (!user.isActive) {
+      throw new ForbiddenException(
+        'Ce compte a été désactivé. Contactez le support.',
+      );
+    }
+
+    // Success — reset failed attempts + update lastLoginAt
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: new Date(),
+      },
+    });
 
     return this.buildResponse(user);
   }
+
+  // ─── Refresh ──────────────────────────────────────────────────────────────
 
   async refresh(refreshToken: string | undefined): Promise<AuthResponseDto> {
     if (!refreshToken) {
       throw new UnauthorizedException('No refresh token provided');
     }
 
-    // Vérifier si token est blacklisté
+    // Check blacklist
     const tokenHash = this.hashToken(refreshToken);
     const blacklisted = await this.prisma.tokenBlacklist.findUnique({
       where: { tokenHash },
     });
-
     if (blacklisted) {
       throw new UnauthorizedException('Token has been revoked');
     }
 
-    // Valider le refresh token
+    // Verify signature + expiry
     let payload: JwtPayload;
     try {
       payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
@@ -80,20 +128,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    // Vérifier que l'utilisateur existe et est actif
+    // User must still exist and be active
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
-
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    // Blacklister l'ancien refresh token (rotation)
+    // Rotate: blacklist the old refresh token before issuing a new one
     const decoded = this.jwtService.decode(refreshToken) as {
       exp: number;
     } | null;
-
     if (decoded?.exp) {
       await this.prisma.tokenBlacklist.create({
         data: {
@@ -103,29 +149,22 @@ export class AuthService {
       });
     }
 
-    // Générer nouveaux tokens
     return this.buildResponse(user);
   }
 
+  // ─── Logout ───────────────────────────────────────────────────────────────
+
   async logout(refreshToken: string | undefined): Promise<void> {
-    if (!refreshToken) {
-      return; // Déjà déconnecté
-    }
+    if (!refreshToken) return;
 
     try {
-      // Hasher le token
       const tokenHash = this.hashToken(refreshToken);
-
-      // Décoder pour obtenir l'expiration
       const decoded = this.jwtService.decode(refreshToken) as {
         exp?: number;
       } | null;
 
-      if (!decoded || !decoded.exp) {
-        return; // Token invalide, ignorer
-      }
+      if (!decoded?.exp) return;
 
-      // Ajouter à la blacklist
       await this.prisma.tokenBlacklist.create({
         data: {
           tokenHash,
@@ -133,12 +172,52 @@ export class AuthService {
         },
       });
     } catch (error) {
-      // Ignorer les erreurs (token déjà invalide)
+      // If the token is already expired/invalid, ignore — logout should always succeed
       console.error('Logout error:', error);
     }
   }
 
-  // ─── private helpers ──────────────────────────────────────────────────────
+  // ─── Brute-force helpers ──────────────────────────────────────────────────
+
+  /**
+   * Throws 429 if the user is currently blocked.
+   * Uses User.failedLoginAttempts + User.lockedUntil (already in schema).
+   */
+  private assertNotLocked(user: User): void {
+    if (
+      user.failedLoginAttempts >= MAX_ATTEMPTS &&
+      user.lockedUntil &&
+      user.lockedUntil > new Date()
+    ) {
+      const minutes = Math.ceil(
+        (user.lockedUntil.getTime() - Date.now()) / 60_000,
+      );
+      throw new Error(
+        `Trop de tentatives. Réessayez dans ${minutes} minute(s).`,
+      );
+    }
+  }
+
+  /**
+   * Increments failedLoginAttempts on the User row.
+   * Locks the account for 15 min once MAX_ATTEMPTS is reached.
+   */
+  private async recordFailedAttempt(user: User): Promise<void> {
+    const newCount = user.failedLoginAttempts + 1;
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: newCount,
+        // Only set lockedUntil when we just hit the limit — don't keep extending it
+        ...(newCount === MAX_ATTEMPTS && {
+          lockedUntil: new Date(Date.now() + BLOCK_DURATION_MS),
+        }),
+      },
+    });
+  }
+
+  // ─── Private helpers ──────────────────────────────────────────────────────
 
   private async buildResponse(user: User): Promise<AuthResponseDto> {
     const payload: JwtPayload = {
@@ -146,16 +225,14 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role as Role, // 👈 add this
+      role: user.role as Role,
     };
 
-    // Générer access token (courte durée)
     const access_token = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
       expiresIn: '15m',
     });
 
-    // Générer refresh token (longue durée)
     const refresh_token = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
@@ -169,6 +246,7 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        role: user.role as Role,
       },
     };
   }

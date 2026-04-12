@@ -6,16 +6,18 @@ import { AuthModule } from './auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
-      // ensure that .env is loaded globally
       isGlobal: true,
     }),
     PrismaModule,
     AuthModule,
     UsersModule,
     ScheduleModule.forRoot(),
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
