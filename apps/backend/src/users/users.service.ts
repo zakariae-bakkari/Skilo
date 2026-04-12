@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AddSkillDto, UpdateSkillLevelDto } from './dto/skill.dto'; // ← was missing
 import { SkillType } from 'generated/prisma/client';
+import { MatchingService } from 'src/matching/matching.service';
 // SkillsService removed — UsersService handles skill ops directly via Prisma
 
 // Fields we NEVER return in any response
@@ -41,7 +42,10 @@ const SKILL_SELECT = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly matchingService: MatchingService,
+  ) {}
 
   // ─── GET /users/me ────────────────────────────────────────────────────────
   async getMe(userId: string) {
@@ -272,6 +276,8 @@ export class UsersService {
       data: { usageCount: { increment: 1 } },
     });
 
+    await this.matchingService.recalculateForUser(userId); // Recalculate matches for this user since their skills changed
+
     return { message: 'Compétence ajoutée.', skill: userSkill };
   }
 
@@ -298,6 +304,8 @@ export class UsersService {
         skillCatalog: { select: { id: true, name: true } },
       },
     });
+
+    await this.matchingService.recalculateForUser(userId); // Recalculate matches for this user since their skills changed
 
     return { message: 'Niveau mis à jour.', skill: updated };
   }
@@ -338,6 +346,8 @@ export class UsersService {
     }
 
     await this.prisma.userSkill.delete({ where: { id: userSkillId } });
+
+    await this.matchingService.recalculateForUser(userId); // Recalculate matches for this user since their skills changed
 
     return { message: 'Compétence supprimée.' };
   }
