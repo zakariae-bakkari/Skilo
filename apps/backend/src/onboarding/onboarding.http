@@ -1,0 +1,167 @@
+# ══════════════════════════════════════════════════════════════════
+#  skilo API — Onboarding
+#  Base: http://localhost:2006
+#  ⚠ Set @token to the access_token from /auth/register or /auth/login
+# ══════════════════════════════════════════════════════════════════
+
+@baseUrl = http://localhost:2006
+@token   = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDIiLCJlbWFpbCI6Im1lcmllbUBza2lsby5hcHAiLCJmaXJzdE5hbWUiOiJNZXJpZW0iLCJsYXN0TmFtZSI6Ik91YWxpIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NzU5NjEwNTMsImV4cCI6MTc3NTk2MTk1M30.Yuqp_FqQZRPjvD2CoIHPNMBaYqaxx3jhWHUycO69Iug
+
+# ── Skill IDs — grab real ones with GET /skills/search?q=java ─────
+@skill1  = 0031d8aa-d265-47f8-a7f1-f026456ca582
+@skill2  = 0031d8aa-d265-47f8-a7f1-f026456ca582
+@skill3  = 0031d8aa-d265-47f8-a7f1-f026456ca582
+
+
+# ──────────────────────────────────────────────────────────────────
+# 1. STATUS (before completing onboarding)
+# ──────────────────────────────────────────────────────────────────
+
+### ✅ GET /onboarding/status — shows what is already filled
+GET {{baseUrl}}/onboarding/status
+Authorization: Bearer {{token}}
+
+
+# ──────────────────────────────────────────────────────────────────
+# 2. COMPLETE ONBOARDING (single request — all steps at once)
+# ──────────────────────────────────────────────────────────────────
+
+### ✅ POST /onboarding — success (all 3 steps in one body)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [
+    { "skillId": "0031d8aa-d265-47f8-a7f1-f026456ca582", "level": "intermediate" },
+    { "skillId": "0031d8aa-d265-47f8-a7f1-f026456ca582", "level": "advanced" }
+  ],
+  "skillsWanted": [
+    { "skillId": "0031d8aa-d265-47f8-a7f1-f026456ca582", "level": "beginner" }
+  ],
+  "city": "Casablanca",
+  "bio": "Je suis passionné par le code et j'adore apprendre de nouvelles choses.",
+  "avatarUrl": "https://res.cloudinary.com/skilo/image/upload/v1/avatars/sample.jpg"
+}
+
+### ✅ POST /onboarding — minimal (no bio, no avatar — both optional)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [
+    { "skillId": "{{skill1}}", "level": "beginner" }
+  ],
+  "skillsWanted": [
+    { "skillId": "{{skill2}}", "level": "intermediate" }
+  ],
+  "city": "Rabat"
+}
+
+
+# ──────────────────────────────────────────────────────────────────
+# 3. ERROR CASES
+# ──────────────────────────────────────────────────────────────────
+
+### ❌ No token (401)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+
+{
+  "skillsOffered": [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill2}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### ❌ skillsOffered empty — min 1 required (400)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [],
+  "skillsWanted": [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### ❌ Too many skills — max 5 each (400)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" }
+  ],
+  "skillsWanted": [{ "skillId": "{{skill2}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### ❌ Invalid skill UUID (400)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "not-a-uuid", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### ❌ skillId does not exist in catalog (400)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "00000000-0000-0000-0000-000000000000", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### ❌ Invalid level value (400)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "{{skill1}}", "level": "expert" }],
+  "skillsWanted":  [{ "skillId": "{{skill2}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### ❌ City missing (400)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill2}}", "level": "beginner" }]
+}
+
+### ❌ Onboarding already done (400)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill2}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+
+# ──────────────────────────────────────────────────────────────────
+# 4. STATUS (after completing onboarding)
+# ──────────────────────────────────────────────────────────────────
+
+### ✅ GET /onboarding/status — should now show isOnboarded: true
+GET {{baseUrl}}/onboarding/status
+Authorization: Bearer {{token}}

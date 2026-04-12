@@ -1,118 +1,106 @@
-// auth/auth.controller.ts
 import {
-  Controller,
-  Post,
-  Get,
   Body,
-  UseGuards,
-  Res,
-  Req,
+  Controller,
+  Get,
   HttpCode,
   HttpStatus,
+  Post,
+  UseGuards,
+  Request,
+  Res,
+  Req,
 } from '@nestjs/common';
-import { Response, Request } from 'express';
+import { Request as ExpressRequest, Response } from 'express';
 import { AuthService } from './auth.service';
+import { JwtGuard } from './guards/jwt.guard';
+import { RolesGuard } from './guards/roles.guard'; // ← import added
 import { RegisterDto } from './dto/register.dto';
-import { LocalAuthGuard } from './guards/local-auth.guard';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { Public } from './decorators/public.decorator';
-import { CurrentUser } from './decorators/current-user.decorator';
-import { AuthUser } from './types/auth-user.type';
+import { LoginDto } from './dto/login.dto';
+import { AuthResponseDto } from './dto/auth-response.dto';
+import { RequestWithUser } from './types/request-with-user.type';
+import { JwtPayload } from './types/jwt-payload.type';
+import { Roles } from './decorators/roles.decorator';
+import { Role } from './enums/role.enum';
 
-const COOKIE_OPTIONS = {
-  httpOnly: true, // inaccessible au JS côté client
+// Helper: cookie options in one place so they're always consistent
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 jours en ms
-  path: '/auth/refresh', // cookie envoyé uniquement sur cette route
+  sameSite: 'strict' as const, // BUG FIX: was 'lax', spec says SameSite=Strict
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/auth',
 };
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
-  // POST /auth/register
-  @Public()
   @Post('register')
+  @HttpCode(HttpStatus.CREATED)
   async register(
     @Body() dto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
-  ) {
+  ): Promise<Omit<AuthResponseDto, 'refresh_token'>> {
     const result = await this.authService.register(dto);
-    this.setRefreshCookie(res, result.refresh_token);
-    return {
-      user: result.user,
-      access_token: result.access_token,
-    };
+    res.cookie('refresh_token', result.refresh_token, REFRESH_COOKIE_OPTIONS);
+    return { access_token: result.access_token, user: result.user };
   }
 
-  // POST /auth/login  (LocalStrategy valide email+password)
-  @Public()
-  @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
-    @CurrentUser() authUser: AuthUser,
+    @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.login(authUser);
-    this.setRefreshCookie(res, result.refresh_token);
-
-    // Le refresh token ne sort JAMAIS dans le body
-    return {
-      user: result.user,
-      access_token: result.access_token,
-    };
+  ): Promise<Omit<AuthResponseDto, 'refresh_token'>> {
+    const result = await this.authService.login(dto);
+    res.cookie('refresh_token', result.refresh_token, REFRESH_COOKIE_OPTIONS);
+    return { access_token: result.access_token, user: result.user };
   }
 
-  // ─────────────────────────────────────────────
-  // POST /auth/refresh
-  // ─────────────────────────────────────────────
-  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
-    @Req() req: Request,
+    @Req() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response,
-  ) {
-    const cookies = req.cookies as { refresh_token?: string } | undefined;
-    const refreshToken = cookies?.refresh_token;
-    if (!refreshToken) {
-      return res
-        .status(HttpStatus.UNAUTHORIZED)
-        .json({ message: 'Refresh token manquant' });
-    }
-
+  ): Promise<Omit<AuthResponseDto, 'refresh_token'>> {
+    const refreshToken = (
+      req as ExpressRequest & { cookies?: { refresh_token?: string } }
+    ).cookies?.refresh_token;
     const result = await this.authService.refresh(refreshToken);
-    return {
-      user: result.user,
-      access_token: result.access_token,
-    };
+    res.cookie('refresh_token', result.refresh_token, REFRESH_COOKIE_OPTIONS);
+    return { access_token: result.access_token, user: result.user };
   }
 
-  // POST /auth/logout
-  @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const cookies = req.cookies as { refresh_token?: string } | undefined;
-    const refreshToken = cookies?.refresh_token;
+  async logout(
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ message: string }> {
+    const refreshToken = (
+      req as ExpressRequest & { cookies?: { refresh_token?: string } }
+    ).cookies?.refresh_token;
     if (refreshToken) {
       await this.authService.logout(refreshToken);
     }
-    res.clearCookie('refresh_token', { path: '/auth/refresh' });
+    res.clearCookie('refresh_token', { path: '/auth' });
     return { message: 'Déconnecté avec succès' };
   }
 
-  // GET /auth/me  — profil courant
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtGuard)
   @Get('me')
-  async me(@CurrentUser() user: AuthUser) {
-    return this.authService.me(user.id);
+  @HttpCode(HttpStatus.OK)
+  getProfile(@Request() req: RequestWithUser): JwtPayload {
+    return req.user;
   }
 
-  // PRIVATE
-  private setRefreshCookie(res: Response, refreshToken: string) {
-    res.cookie('refresh_token', refreshToken, COOKIE_OPTIONS);
+  // BUG FIX: added RolesGuard — without it @Roles() is just a decoration with no effect.
+  // Order matters: JwtGuard runs first (authenticates), then RolesGuard (authorises).
+  @Roles(Role.ADMIN)
+  @UseGuards(JwtGuard, RolesGuard)
+  @Get('admin')
+  @HttpCode(HttpStatus.OK)
+  getAdminData(): { secret: string } {
+    return { secret: 'admin_data' };
   }
 }

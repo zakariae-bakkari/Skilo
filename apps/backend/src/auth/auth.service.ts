@@ -1,107 +1,95 @@
-// auth/auth.service.ts
 import {
-  Injectable,
   ConflictException,
   ForbiddenException,
+  Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { RegisterDto } from './dto/register.dto';
-import { AuthUser } from './types/auth-user.type';
+import { LoginDto } from './dto/login.dto';
+import { AuthResponseDto } from './dto/auth-response.dto';
+import { JwtPayload } from './types/jwt-payload.type';
+import { User } from 'generated/prisma/client';
+import { Role } from './enums/role.enum';
 
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCK_DURATION_MINUTES = 15;
-
-// Champs publics renvoyés dans toutes les réponses auth
-const USER_SELECT = {
-  id: true,
-  email: true,
-  firstName: true,
-  lastName: true,
-  city: true,
-  avatarUrl: true,
-  isOnboarded: true,
-  onboardingStep: true,
-  creditBalance: true,
-  profileScore: true,
-  createdAt: true,
-} as const;
+const BCRYPT_COST = 12; // spec FC-01-A
+const MAX_ATTEMPTS = 5;
+const BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
-    private jwt: JwtService,
-    private config: ConfigService,
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
-  // REGISTER
-  async register(dto: RegisterDto) {
+  // ─── Register ─────────────────────────────────────────────────────────────
+
+  async register(dto: RegisterDto): Promise<AuthResponseDto> {
+    // Case-insensitive uniqueness check
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
     });
+    if (existing) {
+      throw new ConflictException(
+        'Cette adresse email est déjà associée à un compte.',
+      );
+    }
 
-    if (existing) throw new ConflictException('Email déjà utilisé');
-
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST);
 
     const user = await this.prisma.user.create({
       data: {
         email: dto.email.toLowerCase(),
-        emailLower: dto.email.toLowerCase(),
         passwordHash,
         firstName: dto.firstName,
         lastName: dto.lastName,
+        // creditBalance defaults to 2 in schema (welcome bonus — FC-06-A)
       },
-      select: USER_SELECT,
     });
 
-    const tokens = await this.generateTokens(user.id, user.email);
-    return { user, ...tokens };
+    return this.buildResponse(user);
   }
 
-  // VALIDATE USER (appelé par LocalStrategy)
-  async validateUser(
-    email: string,
-    password: string,
-  ): Promise<AuthUser | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+  // ─── Login ────────────────────────────────────────────────────────────────
 
-    if (!user) return null;
+  async login(dto: LoginDto): Promise<AuthResponseDto> {
+    const email = dto.email.toLowerCase();
 
-    // Bruteforce protection (FC-01-B)
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    // Brute-force check (FC-01-B) — runs before password comparison.
+    // If the user doesn't exist we skip it (nothing to lock) and fall through
+    // to the generic 401 below — never revealing whether the email exists.
+    if (user) {
+      this.assertNotLocked(user);
+    }
+
+    if (!user) {
+      // Generic message — never confirm whether the email exists
+      throw new UnauthorizedException('Email ou mot de passe incorrect.');
+    }
+
+    const passwordMatch = await bcrypt.compare(dto.password, user.passwordHash);
+
+    if (!passwordMatch) {
+      await this.recordFailedAttempt(user);
+      throw new UnauthorizedException('Email ou mot de passe incorrect.');
+    }
+
+    // Disabled account check (FC-01-B)
+    if (!user.isActive) {
       throw new ForbiddenException(
-        `Compte verrouillé jusqu'à ${user.lockedUntil.toISOString()}`,
+        'Ce compte a été désactivé. Contactez le support.',
       );
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
-
-    if (!valid) {
-      const attempts = user.failedLoginAttempts + 1;
-      const shouldLock = attempts >= MAX_FAILED_ATTEMPTS;
-
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          failedLoginAttempts: attempts,
-          lockedUntil: shouldLock
-            ? new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000)
-            : undefined,
-        },
-      });
-
-      return null;
-    }
-
-    // Réinitialise le compteur après succès
+    // Success — reset failed attempts + update lastLoginAt
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -111,126 +99,158 @@ export class AuthService {
       },
     });
 
-    return user;
+    return this.buildResponse(user);
   }
 
-  // ─────────────────────────────────────────────
-  // LOGIN — retourne access_token + refresh_token + user
-  // ─────────────────────────────────────────────
-  async login(authUser: AuthUser) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: authUser.id },
-      select: USER_SELECT,
-    });
+  // ─── Refresh ──────────────────────────────────────────────────────────────
 
-    const tokens = await this.generateTokens(authUser.id, authUser.email);
-    return { user, ...tokens };
-  }
-
-  // ─────────────────────────────────────────────
-  // REFRESH — valide le refresh token et émet un nouvel access token
-  // ─────────────────────────────────────────────
-  async refresh(refreshToken: string) {
-    // 1. Vérifie la signature JWT du refresh token
-    let payload: { sub: string; email: string; type: string };
-    try {
-      payload = this.jwt.verify(refreshToken, {
-        secret: this.config.get<string>('JWT_REFRESH_SECRET'),
-      });
-    } catch {
-      throw new UnauthorizedException('Refresh token invalide ou expiré');
+  async refresh(refreshToken: string | undefined): Promise<AuthResponseDto> {
+    if (!refreshToken) {
+      throw new UnauthorizedException('No refresh token provided');
     }
 
-    if (payload.type !== 'refresh') {
-      throw new UnauthorizedException('Type de token incorrect');
-    }
-
-    // 2. Vérifie que le token n'est pas blacklisté
+    // Check blacklist
     const tokenHash = this.hashToken(refreshToken);
     const blacklisted = await this.prisma.tokenBlacklist.findUnique({
       where: { tokenHash },
     });
-    if (blacklisted) throw new UnauthorizedException('Token révoqué');
-
-    // 3. Vérifie que l'utilisateur existe toujours
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: USER_SELECT,
-    });
-    if (!user) throw new UnauthorizedException('Utilisateur introuvable');
-
-    // 4. Émet un nouvel access token (rotation partielle : refresh token inchangé)
-    const accessToken = this.signAccessToken(payload.sub, payload.email);
-
-    return { user, access_token: accessToken };
-  }
-
-  // ─────────────────────────────────────────────
-  // LOGOUT — blackliste le refresh token
-  // ─────────────────────────────────────────────
-  async logout(refreshToken: string) {
-    let payload: { exp: number };
-    try {
-      payload = this.jwt.decode(refreshToken);
-    } catch {
-      return; // Token malformé : pas grave, on ignore
+    if (blacklisted) {
+      throw new UnauthorizedException('Token has been revoked');
     }
 
-    const tokenHash = this.hashToken(refreshToken);
-    const expiresAt = new Date(payload.exp * 1000);
+    // Verify signature + expiry
+    let payload: JwtPayload;
+    try {
+      payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
 
-    // Upsert : évite les doublons si logout appelé deux fois
-    await this.prisma.tokenBlacklist.upsert({
-      where: { tokenHash },
-      create: { tokenHash, expiresAt },
-      update: {},
-    });
-  }
-
-  // ─────────────────────────────────────────────
-  // ME — retourne le profil courant depuis le JWT
-  // ─────────────────────────────────────────────
-  async me(userId: string) {
+    // User must still exist and be active
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: USER_SELECT,
+      where: { id: payload.sub },
     });
-    if (!user) throw new UnauthorizedException('Utilisateur introuvable');
-    return { user };
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User not found or inactive');
+    }
+
+    // Rotate: blacklist the old refresh token before issuing a new one
+    const decoded = this.jwtService.decode(refreshToken) as {
+      exp: number;
+    } | null;
+    if (decoded?.exp) {
+      await this.prisma.tokenBlacklist.create({
+        data: {
+          tokenHash,
+          expiresAt: new Date(decoded.exp * 1000),
+        },
+      });
+    }
+
+    return this.buildResponse(user);
   }
 
-  // ─────────────────────────────────────────────
-  // PRIVATE HELPERS
-  // ─────────────────────────────────────────────
-  private async generateTokens(userId: string, email: string) {
-    const [access_token, refresh_token] = await Promise.all([
-      Promise.resolve(this.signAccessToken(userId, email)),
-      Promise.resolve(this.signRefreshToken(userId, email)),
-    ]);
-    return { access_token, refresh_token };
+  // ─── Logout ───────────────────────────────────────────────────────────────
+
+  async logout(refreshToken: string | undefined): Promise<void> {
+    if (!refreshToken) return;
+
+    try {
+      const tokenHash = this.hashToken(refreshToken);
+      const decoded = this.jwtService.decode(refreshToken) as {
+        exp?: number;
+      } | null;
+
+      if (!decoded?.exp) return;
+
+      await this.prisma.tokenBlacklist.create({
+        data: {
+          tokenHash,
+          expiresAt: new Date(decoded.exp * 1000),
+        },
+      });
+    } catch (error) {
+      // If the token is already expired/invalid, ignore — logout should always succeed
+      console.error('Logout error:', error);
+    }
   }
 
-  private signAccessToken(userId: string, email: string): string {
-    return this.jwt.sign(
-      { sub: userId, email, type: 'access' },
-      {
-        secret: this.config.get<string>('JWT_SECRET'),
-        expiresIn: '15m',
+  // ─── Brute-force helpers ──────────────────────────────────────────────────
+
+  /**
+   * Throws 429 if the user is currently blocked.
+   * Uses User.failedLoginAttempts + User.lockedUntil (already in schema).
+   */
+  private assertNotLocked(user: User): void {
+    if (
+      user.failedLoginAttempts >= MAX_ATTEMPTS &&
+      user.lockedUntil &&
+      user.lockedUntil > new Date()
+    ) {
+      const minutes = Math.ceil(
+        (user.lockedUntil.getTime() - Date.now()) / 60_000,
+      );
+      throw new Error(
+        `Trop de tentatives. Réessayez dans ${minutes} minute(s).`,
+      );
+    }
+  }
+
+  /**
+   * Increments failedLoginAttempts on the User row.
+   * Locks the account for 15 min once MAX_ATTEMPTS is reached.
+   */
+  private async recordFailedAttempt(user: User): Promise<void> {
+    const newCount = user.failedLoginAttempts + 1;
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: newCount,
+        // Only set lockedUntil when we just hit the limit — don't keep extending it
+        ...(newCount === MAX_ATTEMPTS && {
+          lockedUntil: new Date(Date.now() + BLOCK_DURATION_MS),
+        }),
       },
-    );
+    });
   }
 
-  private signRefreshToken(userId: string, email: string): string {
-    return this.jwt.sign(
-      { sub: userId, email, type: 'refresh' },
-      {
-        secret: this.config.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: '7d',
+  // ─── Private helpers ──────────────────────────────────────────────────────
+
+  private async buildResponse(user: User): Promise<AuthResponseDto> {
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role as Role,
+    };
+
+    const access_token = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('JWT_SECRET'),
+      expiresIn: '15m',
+    });
+
+    const refresh_token = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: '7d',
+    });
+
+    return {
+      access_token,
+      refresh_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role as Role,
       },
-    );
+    };
   }
 
-  /** SHA-256 du token — jamais stocké en clair */
   private hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
   }

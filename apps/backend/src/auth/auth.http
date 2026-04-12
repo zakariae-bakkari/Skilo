@@ -1,300 +1,99 @@
-### ═══════════════════════════════════════════════════════════════
-### SKILO — Auth HTTP Tests
-### Extension VS Code requise : REST Client (humao.rest-client)
-### ═══════════════════════════════════════════════════════════════
-
+### Variables
 @baseUrl = http://localhost:2006
-@contentType = application/json
-
-### Variables dynamiques (remplies automatiquement après login/register)
-@accessToken = {{login.response.body.access_token}}
-@registerToken = {{register.response.body.access_token}}
-
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhNzYwNGE0OS01MWYzLTRiOTMtYTY0NC00M2Q1N2Q3N2I1Y2EiLCJlbWFpbCI6ImpvaG4uZG9lQGV4YW1wbGUuY29tIiwiZmlyc3ROYW1lIjoiSm9obiIsImxhc3ROYW1lIjoiRG9lIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NzU5NTkyNDMsImV4cCI6MTc3NTk2MDE0M30.nJ14qKeHAaGOpTXulnogmy8U402p0Az_9U4OPCZFyqs
 
 ### ─────────────────────────────────────────────────────────────
-### 1. REGISTER — Créer un nouveau compte
-### ─────────────────────────────────────────────────────────────
-
-# @name register
+### Register a new user
 POST {{baseUrl}}/auth/register
-Content-Type: {{contentType}}
+Content-Type: application/json
 
 {
-  "email": "hasanne@skilo.com",
+  "email": "meriemti@example.com",
   "password": "Password123",
-  "firstName": "Alice",
-  "lastName": "Dupont"
+  "firstName": "John",
+  "lastName": "Doe"
 }
 
-### Réponse attendue 201 :
-### {
-###   "user": { "id", "email", "firstName", "lastName", "avatarUrl", "isOnboarded", ... },
-###   "access_token": "eyJ..."
-### }
-### + cookie Set-Cookie: refresh_token=... (httpOnly, path=/auth/refresh) 
-
-
 ### ─────────────────────────────────────────────────────────────
-### 2. REGISTER — Email déjà utilisé (doit retourner 409)
-### ─────────────────────────────────────────────────────────────
-
-POST {{baseUrl}}/auth/register
-Content-Type: {{contentType}}
-
-{
-  "email": "alice@skilo.com",
-  "password": "Password123",
-  "firstName": "Alice",
-  "lastName": "Dupont"
-}
-
-### Réponse attendue 409 :
-### { "statusCode": 409, "message": "Email déjà utilisé" }
-
-
-### ─────────────────────────────────────────────────────────────
-### 3. REGISTER — Validation échouée (mot de passe trop faible)
-### ─────────────────────────────────────────────────────────────
-
-POST {{baseUrl}}/auth/register
-Content-Type: {{contentType}}
-
-{
-  "email": "bob@skilo.com",
-  "password": "weak",
-  "firstName": "Bob",
-  "lastName": "Martin"
-}
-
-### Réponse attendue 400 :
-### { "statusCode": 400, "message": ["Mot de passe : 8 caractères minimum", ...] }
-
-
-### ─────────────────────────────────────────────────────────────
-### 4. LOGIN — Connexion valide
-### ─────────────────────────────────────────────────────────────
-
-# @name login
+### Login with existing user
 POST {{baseUrl}}/auth/login
-Content-Type: {{contentType}}
+Content-Type: application/json
 
 {
   "email": "meriem@skilo.app",
   "password": "Password123!"
 }
 
-### Réponse attendue 200 :
-### {
-###   "user": {
-###     "id": "uuid",
-###     "email": "alice@skilo.com",
-###     "firstName": "Alice",
-###     "lastName": "Dupont",
-###     "avatarUrl": null,
-###     "isOnboarded": false,
-###     "onboardingStep": 1,
-###     "creditBalance": 2,
-###     "profileScore": 0,
-###     "createdAt": "2025-..."
-###   },
-###   "access_token": "eyJ..."
-### }
-### + cookie Set-Cookie: refresh_token=... (httpOnly, path=/auth/refresh)
-
-
 ### ─────────────────────────────────────────────────────────────
-### 5. LOGIN — Mauvais mot de passe (doit retourner 401)
-### ─────────────────────────────────────────────────────────────
-
-POST {{baseUrl}}/auth/login
-Content-Type: {{contentType}}
-
-{
-  "email": "alice@skilo.com",
-  "password": "WrongPassword1"
-}
-
-### Réponse attendue 401 :
-### { "statusCode": 401, "message": "Email ou mot de passe incorrect" }
-
-
-### ─────────────────────────────────────────────────────────────
-### 6. LOGIN — Email inexistant
-### ─────────────────────────────────────────────────────────────
-
-POST {{baseUrl}}/auth/login
-Content-Type: {{contentType}}
-
-{
-  "email": "nobody@skilo.com",
-  "password": "Password123"
-}
-
-### Réponse attendue 401 :
-### { "statusCode": 401, "message": "Email ou mot de passe incorrect" }
-
-
-### ─────────────────────────────────────────────────────────────
-### 7. LOGIN — Bruteforce : 5 tentatives → compte verrouillé
-### ─────────────────────────────────────────────────────────────
-
-POST {{baseUrl}}/auth/login
-Content-Type: {{contentType}}
-
-{
-  "email": "alice@skilo.com",
-  "password": "Wrong1"
-}
-
-### Répéter 5x → Réponse attendue 403 (après 5 échecs) :
-### { "statusCode": 403, "message": "Compte verrouillé jusqu'à 2025-XX-XXTXX:XX:XXZ" }
-
-
-### ─────────────────────────────────────────────────────────────
-### 8. GET ME — Profil courant (JWT requis)
-### ─────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/auth/me
-Authorization: Bearer {{accessToken}}
-
-### Réponse attendue 200 :
-### {
-###   "user": { "id", "email", "firstName", "lastName", ... }
-### }
-
-
-### ─────────────────────────────────────────────────────────────
-### 9. GET ME — Sans token (doit retourner 401)
-### ─────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/auth/me
-
-### Réponse attendue 401 :
-### { "statusCode": 401, "message": "Unauthorized" }
-
-
-### ─────────────────────────────────────────────────────────────
-### 10. GET ME — Token expiré ou invalide
-### ─────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/auth/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fake.token
-
-### Réponse attendue 401 :
-### { "statusCode": 401, "message": "Unauthorized" }
-
-
-### ─────────────────────────────────────────────────────────────
-### 11. REFRESH — Obtenir un nouvel access token
-### Note : le cookie refresh_token doit être présent (posé au login)
-### REST Client envoie automatiquement les cookies si même domaine
-### ─────────────────────────────────────────────────────────────
-
-# @name refresh
+### Refresh access token (uses refresh_token cookie automatically)
 POST {{baseUrl}}/auth/refresh
-Content-Type: {{contentType}}
-### Réponse attendue 200 :
-### {
-###   "user": { ... },
-###   "access_token": "eyJ... (nouveau)"
-### }
-
 
 ### ─────────────────────────────────────────────────────────────
-### 12. REFRESH — Sans cookie (doit retourner 401)
-### ─────────────────────────────────────────────────────────────
-
-POST {{baseUrl}}/auth/refresh
-Content-Type: {{contentType}}
-
-### Réponse attendue 401 :
-### { "statusCode": 401, "message": "Refresh token manquant" }
-
-
-### ─────────────────────────────────────────────────────────────
-### 13. LOGOUT — Déconnexion (JWT requis)
-### ─────────────────────────────────────────────────────────────
-
+### Logout (revokes refresh_token)
 POST {{baseUrl}}/auth/logout
-Authorization: Bearer {{accessToken}}
-Content-Type: {{contentType}}
-
-### Réponse attendue 200 :
-### { "message": "Déconnecté avec succès" }
-### + Set-Cookie: refresh_token=; Max-Age=0 (cookie effacé)
-
 
 ### ─────────────────────────────────────────────────────────────
-### 14. LOGOUT — Sans JWT (doit retourner 401)
-### ─────────────────────────────────────────────────────────────
-
-POST {{baseUrl}}/auth/logout
-Content-Type: {{contentType}}
-
-### Réponse attendue 401 :
-### { "statusCode": 401, "message": "Unauthorized" }
-
+### Get current user profile (protected route)
+### Copy the access_token from login/register response and paste it below
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
 
 ### ─────────────────────────────────────────────────────────────
-### 15. REFRESH après LOGOUT — token blacklisté (doit retourner 401)
-### Faire d'abord le test 13 (logout), puis relancer ce refresh
-### ─────────────────────────────────────────────────────────────
-
-POST {{baseUrl}}/auth/refresh
-Content-Type: {{contentType}}
-
-### Réponse attendue 401 :
-### { "statusCode": 401, "message": "Token révoqué" }
-
-
-### ─────────────────────────────────────────────────────────────
-### 16. ROUTE PROTÉGÉE EXEMPLE — users (JWT requis)
-### ─────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/users
-Authorization: Bearer {{accessToken}}
-
-### Réponse attendue 200 : liste des utilisateurs
-
-
-### ─────────────────────────────────────────────────────────────
-### 17. ROUTE ADMIN EXEMPLE — accès refusé si pas admin
-### ─────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/users/admin-panel
-Authorization: Bearer {{accessToken}}
-
-### Réponse attendue 403 (si user n'est pas admin) :
-### { "statusCode": 403, "message": "Accès refusé : rôle insuffisant" }
-
-
-### ─────────────────────────────────────────────────────────────
-### 18. REGISTER — Email en majuscules (doit être normalisé)
-### ─────────────────────────────────────────────────────────────
-
+### Register - Test validation errors (email invalide)
 POST {{baseUrl}}/auth/register
-Content-Type: {{contentType}}
+Content-Type: application/json
 
 {
-  "email": "Charlie@SKILO.COM",
+  "email": "invalid-email",
   "password": "Password123",
-  "firstName": "Charlie",
-  "lastName": "Leblanc"
+  "firstName": "Jane",
+  "lastName": "Smith"
 }
 
-### Réponse attendue 201 : user.email = "charlie@skilo.com" (lowercase)
-
-
 ### ─────────────────────────────────────────────────────────────
-### 19. LOGIN — Email en majuscules (insensible à la casse)
-### ─────────────────────────────────────────────────────────────
-
-POST {{baseUrl}}/auth/login
-Content-Type: {{contentType}}
+### Register - Test validation errors (mot de passe faible)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
 
 {
-  "email": "CHARLIE@skilo.com",
-  "password": "Password123"
+  "email": "jane.smith@example.com",
+  "password": "weak",
+  "firstName": "Jane",
+  "lastName": "Smith"
+}
+###
+
+GET {{baseUrl}}/auth/admin
+Content-Type: application/json 
+Authorization: Bearer {{token}}
+
+### ─────────────────────────────────────────────────────────────
+### Register - Test email already exists
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "Password123",
+  "firstName": "John",
+  "lastName": "Duplicate"
 }
 
-### Réponse attendue 200 : login réussi malgré la casse différente
+### ─────────────────────────────────────────────────────────────
+### Login - Test invalid credentials
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "WrongPassword123"
+}
+
+### ─────────────────────────────────────────────────────────────
+### Get profile without token (should fail)
+GET {{baseUrl}}/auth/me
+
+### ─────────────────────────────────────────────────────────────
+### Get profile with invalid token (should fail)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer invalid_token_here

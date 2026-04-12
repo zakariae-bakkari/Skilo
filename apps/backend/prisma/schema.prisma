@@ -37,6 +37,13 @@ enum SkillStatus {
   @@map("skill_status_enum")
 }
 
+enum UserRoles {
+  user
+  admin
+
+  @@map("user_roles_enum")
+}
+
 enum SkillLevel {
   beginner
   intermediate
@@ -137,11 +144,10 @@ model TokenBlacklist {
 model User {
   id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email               String    @unique @db.VarChar(255)
-  /// Colonne générée — unicité insensible à la casse (LOWER(email))
-  emailLower          String?   @db.VarChar(255)
   passwordHash        String    @db.VarChar(60) /// Hash bcrypt coût 12 — jamais le mot de passe en clair
   firstName           String    @db.VarChar(50)
   lastName            String    @db.VarChar(50)
+  role                UserRoles @default(user)
   city                String?   @db.VarChar(100)
   bio                 String?   @db.VarChar(280)
   avatarUrl           String?   @db.VarChar(500)
@@ -159,7 +165,7 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime? @db.Timestamptz() /// NULL = pas bloqué. Protection brute force (FC-01-B)
   lastLoginAt         DateTime? @db.Timestamptz()
-  onboardingStep      Int       @default(1) /// 1=compétences offertes, 2=recherchées, 3=infos perso
+//  onboardingStep      Int       @default(1) /// 1=compétences offertes, 2=recherchées, 3=infos perso
   createdAt           DateTime  @default(now()) @db.Timestamptz()
   updatedAt           DateTime  @updatedAt @db.Timestamptz()
 
@@ -189,8 +195,6 @@ model User {
 model SkillCatalog {
   id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String        @db.VarChar(100)
-  /// Colonne générée — LOWER(name) pour l'unicité et la recherche floue
-  //nameLower   String?       @db.VarChar(100) -> pas besoin car dans l fct rechrcher en va transformer tout en miniscule
   category    SkillCategory
   status      SkillStatus   @default(approved)
   /// Synonymes reconnus ex: ['JS', 'ECMAScript'] pour JavaScript
@@ -222,13 +226,11 @@ model UserSkill {
   skillCatalogId String     @db.Uuid
   type           SkillType // offered or wanted
   level          SkillLevel
-  /// Description libre max 140 chars
-  description    String?    @db.VarChar(140)
   createdAt      DateTime   @default(now()) @db.Timestamptz()
   updatedAt      DateTime   @updatedAt @db.Timestamptz()
 
   // Relations
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade) 
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   skillCatalog SkillCatalog @relation(fields: [skillCatalogId], references: [id], onDelete: Restrict)
 
   /// Un user ne peut pas ajouter deux fois la même compétence du même type
@@ -249,7 +251,7 @@ model Match {
   id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userAId      String      @db.Uuid /// Toujours l'UUID le plus petit des deux — garantit l'unicité canonique
   userBId      String      @db.Uuid
-  type         MatchType   // zakariae : perfect / partial
+  type         MatchType // zakariae : perfect / partial
   /// Score de compatibilité 0-100
   score        Int
   /// 'Très compatible' | 'Compatible' | 'Partiellement compatible'
