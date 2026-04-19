@@ -362,15 +362,13 @@ export class MatchingService {
     const partial = shaped.filter((m) => m?.type === MatchType.partial);
 
     return {
-      data: { perfect, partial },
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-        perfectCount: perfect.length,
-        partialCount: partial.length,
-      },
+      data: shaped,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      perfectCount: perfect.length,
+      partialCount: partial.length,
     };
   }
 

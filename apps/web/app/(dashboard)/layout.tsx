@@ -5,14 +5,15 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { creditsApi, notificationsApi, CreditBalance, Notification } from '@/lib/api';
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 // ─── Nav items ─────────────────────────────────────────────────────────────────
 
 const NAV = [
   { href: '/dashboard',         label: 'Overview',         icon: '▦'  },
-  { href: '/dashboard/matches', label: 'Matches',          icon: '⇄'  },
-  { href: '/dashboard/sessions',label: 'Sessions',         icon: '📅' },
-  { href: '/dashboard/profile', label: 'My Profile',       icon: '👤' },
+  { href: '/matches', label: 'Matches',          icon: '⇄'  },
+  { href: '/sessions',label: 'Sessions',         icon: '📅' },
+  { href: '/profile', label: 'My Profile',       icon: '👤' },
 ];
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -250,14 +251,14 @@ function AvatarMenu() {
           {/* Links */}
           <div className="py-1">
             <Link
-              href="/dashboard/profile"
+              href="/profile"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted transition-colors"
             >
               <span>👤</span> Mon profil
             </Link>
             <Link
-              href="/dashboard/credits"
+              href="/credits"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted transition-colors"
             >
@@ -339,16 +340,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="min-h-screen flex bg-background">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <SidebarProvider>
+      <div className="h-screen flex bg-background overflow-hidden w-full">
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header onMenuClick={() => setSidebarOpen((o) => !o)} />
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          {children}
-        </main>
+        {/* Main */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <Header onMenuClick={() => setSidebarOpen((o) => !o)} />
+          <main className="flex-1 p-4 lg:p-6 overflow-auto">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

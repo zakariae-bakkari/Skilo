@@ -243,7 +243,7 @@ export default function MatchesPage() {
               : 'Enrichissez votre profil avec plus de compétences !'
             }
           </p>
-          <Link href="/dashboard/profile" className="text-sm text-primary hover:underline">
+          <Link href="/profile" className="text-sm text-primary hover:underline">
             Améliorer mon profil →
           </Link>
         </div>

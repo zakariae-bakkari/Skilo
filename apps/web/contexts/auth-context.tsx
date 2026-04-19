@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '@/lib/api';
+import { User, setAccessToken, onboardingApi } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
@@ -34,6 +34,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const parsed: User = JSON.parse(storedUser);
       setUser(parsed);
       setIsOnboarded(parsed.isOnboarded ?? false);
+      
+      // Sync memory token for API client immediately
+      setAccessToken(storedToken);
+
+      // Verify onboarding status with the backend ONLY once
+      // We pass a skipExpiry: true flag (conceptually) or just handle failure quietly
+      onboardingApi.status().then(res => {
+        if (res.isOnboarded !== (parsed.isOnboarded ?? false)) {
+          setIsOnboarded(res.isOnboarded);
+          // Set cookie with expiration to match the token
+          document.cookie = `onboarded=${res.isOnboarded}; path=/; max-age=604800; SameSite=Lax`;
+          const updated = { ...parsed, isOnboarded: res.isOnboarded };
+          localStorage.setItem('user', JSON.stringify(updated));
+          setUser(updated);
+        }
+      }).catch(err => {
+        // If it fails with 401 on boot, it's NOT an "expiration" event for the user
+        // It's just a stale session. Clear it and move on.
+        if (err.message.includes('401') || err.message.includes('Session expirée')) {
+          logout();
+        }
+        console.error('Initial onboarding check failed:', err);
+      });
     } catch {
       // Corrupted data — clean up
       localStorage.removeItem('access_token');
@@ -44,10 +67,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = (access_token: string, loggedInUser: User) => {
+    // 1. Sync memory token first
+    setAccessToken(access_token);
+
+    // 2. Set cookies immediately (Middleware needs these for next navigation)
+    const onboardedStr = String(loggedInUser.isOnboarded ?? false);
+    document.cookie = `access_token=${access_token}; path=/; max-age=604800; SameSite=Lax`;
+    document.cookie = `onboarded=${onboardedStr}; path=/; max-age=604800; SameSite=Lax`;
+
+    // 3. Save to localStorage
     localStorage.setItem('access_token', access_token);
     localStorage.setItem('user', JSON.stringify(loggedInUser));
-    // Mirror in a cookie so Next.js middleware can detect auth state
-    document.cookie = `access_token=${access_token}; path=/; SameSite=Lax`;
+    
+    // 4. Update state
     setUser(loggedInUser);
     setIsOnboarded(loggedInUser.isOnboarded ?? false);
   };
@@ -56,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
     document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'onboarded=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     setUser(null);
     setIsOnboarded(false);
   };
@@ -63,12 +96,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Called after onboarding completes successfully
   const setOnboarded = () => {
     setIsOnboarded(true);
+    document.cookie = 'onboarded=true; path=/; SameSite=Lax';
     if (user) {
       const updated = { ...user, isOnboarded: true };
       localStorage.setItem('user', JSON.stringify(updated));
       setUser(updated);
     }
   };
+
+  // Listen for global session expiration events
+  useEffect(() => {
+    const handleExpired = () => {
+      // If we are already on a public page, don't show the expired alert
+      const isPublicPage = ['/login', '/register', '/'].includes(window.location.pathname);
+      if (isPublicPage) {
+        logout();
+        return;
+      }
+      
+      logout();
+      window.location.href = '/login?expired=true';
+    };
+    window.addEventListener('skilo:session-expired', handleExpired);
+    return () => window.removeEventListener('skilo:session-expired', handleExpired);
+  }, []);
 
   return (
     <AuthContext.Provider

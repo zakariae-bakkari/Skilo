@@ -47,7 +47,7 @@ function ThemeHotkey() {
         return
       }
 
-      if (event.key.toLocaleLowerCase() !== "d") {
+      if (!event.key || event.key.toLocaleLowerCase() !== "d") {
         return
       }
 

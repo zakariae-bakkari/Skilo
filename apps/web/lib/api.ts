@@ -226,14 +226,26 @@ async function request<T>(
 
 async function tryRefresh(): Promise<boolean> {
   try {
-    const data = await fetch(`${BASE_URL}/auth/refresh`, {
+    const res = await fetch(`${BASE_URL}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
     });
-    if (!data.ok) return false;
-    const json = await data.json();
+    if (!res.ok) return false;
+    const json = await res.json();
+    
     if (json?.access_token) {
-      _accessToken = json.access_token;
+      const { access_token, user } = json;
+      _accessToken = access_token;
+      
+      // Sync cookies for middleware
+      const onboardedStr = String(user.isOnboarded ?? false);
+      document.cookie = `access_token=${access_token}; path=/; SameSite=Lax`;
+      document.cookie = `onboarded=${onboardedStr}; path=/; SameSite=Lax`;
+
+      // Sync localStorage for AuthContext rehydration
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
+
       return true;
     }
     return false;
