@@ -1,11 +1,4 @@
-import {
-  IsEnum,
-  IsIn,
-  IsInt,
-  IsOptional,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MatchType, SkillCategory, SkillLevel } from 'generated/prisma/client';
 
@@ -19,7 +12,9 @@ export class MatchFilterDto {
   category?: SkillCategory;
 
   @IsOptional()
-  @IsEnum(SkillLevel, { message: 'level must be: beginner, intermediate or advanced' })
+  @IsEnum(SkillLevel, {
+    message: 'level must be: beginner, intermediate or advanced',
+  })
   level?: SkillLevel;
 
   @IsOptional()

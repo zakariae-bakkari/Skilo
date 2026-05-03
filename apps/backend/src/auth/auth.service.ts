@@ -232,6 +232,7 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role as Role,
+      avatarUrl: user.avatarUrl,
     };
 
     const access_token = await this.jwtService.signAsync(payload, {
@@ -253,6 +254,8 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role as Role,
+        isOnboarded: user.isOnboarded,
+        avatarUrl: user.avatarUrl,
       },
     };
   }

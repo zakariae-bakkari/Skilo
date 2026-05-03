@@ -15,17 +15,24 @@ export class ProposeSessionDto {
   @IsISO8601({}, { message: 'scheduledAt must be a valid date (ISO 8601)' })
   scheduledAt: string;
 
-  @IsIn([30, 60, 90, 120], { message: 'duration must be 30, 60, 90 or 120 minutes' })
+  @IsIn([30, 60, 90, 120], {
+    message: 'duration must be 30, 60, 90 or 120 minutes',
+  })
   duration: number;
 
   @IsUUID('4')
   offeredSkillId: string; // what the initiator teaches
 
   @IsUUID('4')
-  wantedSkillId: string;  // what the initiator learns
+  wantedSkillId: string; // what the initiator learns
 
   @IsOptional()
   @IsString()
   @MaxLength(300)
   message?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  meetingLink?: string;
 }

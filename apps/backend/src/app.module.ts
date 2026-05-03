@@ -13,6 +13,7 @@ import { SessionsModule } from './sessions/sessions.module';
 import { CreditsModule } from './credits/credits.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UploadModule } from './upload/upload.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { UploadModule } from './upload/upload.module';
     CreditsModule,
     ReviewsModule,
     UploadModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,82 @@
+@baseUrl = http://localhost:2006
+@token = PASTE_USER_A_TOKEN
+@tokenB = PASTE_USER_B_TOKEN
+@sessionId = PASTE_SESSION_UUID
+
+### Submit a review after a session is completed (User A reviews User B)
+POST {{baseUrl}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sessionId": "{{sessionId}}",
+  "globalRating": 5,
+  "pedagogyRating": 5,
+  "punctualityRating": 4,
+  "communicationRating": 5,
+  "comment": "Excellente session, très pédagogue !"
+}
+
+### Submit a review for the same session (User B reviews User A)
+POST {{baseUrl}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{tokenB}}
+
+{
+  "sessionId": "{{sessionId}}",
+  "globalRating": 4,
+  "pedagogyRating": 4,
+  "comment": "Bonne session, contenu intéressant."
+}
+
+### Test: Try to review a session that hasn't been completed yet
+POST {{baseUrl}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sessionId": "{{sessionId}}",
+  "globalRating": 3
+}
+
+### Test: Try to submit a second review for the same session
+POST {{baseUrl}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sessionId": "{{sessionId}}",
+  "globalRating": 5
+}
+
+### Test: Try to submit a review without giving a global rating (which is required)
+POST {{baseUrl}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sessionId": "{{sessionId}}",
+  "pedagogyRating": 4
+}
+
+### Test: Try to give a rating higher than 5
+POST {{baseUrl}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sessionId": "{{sessionId}}",
+  "globalRating": 6
+}
+
+### View the reviews for a specific session (only visible when both have reviewed)
+GET {{baseUrl}}/reviews/session/{{sessionId}}
+Authorization: Bearer {{token}}
+
+### View all public reviews written about a specific user
+GET {{baseUrl}}/users/PASTE_USER_UUID/reviews
+Authorization: Bearer {{token}}
+
+### View public reviews about a user with pagination
+GET {{baseUrl}}/users/PASTE_USER_UUID/reviews?page=1&limit=10
+Authorization: Bearer {{token}}

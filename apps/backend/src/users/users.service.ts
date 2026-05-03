@@ -239,19 +239,13 @@ export class UsersService {
     });
     if (!skill) throw new NotFoundException('Skill not found in catalog');
 
-    // Check not already added with same type
-    const existing = await this.prisma.userSkill.findUnique({
-      where: {
-        userId_skillCatalogId_type: {
-          userId,
-          skillCatalogId: dto.skillId,
-          type: dto.type,
-        },
-      },
+    // Check not already added (any type — FC-02-C: a skill cannot be both offered and wanted)
+    const alreadyHas = await this.prisma.userSkill.findFirst({
+      where: { userId, skillCatalogId: dto.skillId },
     });
-    if (existing) {
+    if (alreadyHas) {
       throw new BadRequestException(
-        'You already have this skill in your profile.',
+        `Cette compétence est déjà dans votre profil (${alreadyHas.type === SkillType.offered ? 'offerte' : 'recherchée'}).`,
       );
     }
 

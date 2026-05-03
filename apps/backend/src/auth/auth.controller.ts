@@ -26,9 +26,8 @@ import { Role } from './enums/role.enum';
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const, // BUG FIX: was 'lax', spec says SameSite=Strict
+  sameSite: 'lax' as const,
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  path: '/auth',
 };
 
 @Controller('auth')
@@ -83,7 +82,7 @@ export class AuthController {
     if (refreshToken) {
       await this.authService.logout(refreshToken);
     }
-    res.clearCookie('refresh_token', { path: '/auth' });
+    res.clearCookie('refresh_token');
     return { message: 'Déconnecté avec succès' };
   }
 

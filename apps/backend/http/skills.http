@@ -1,0 +1,153 @@
+@baseUrl = http://localhost:2006
+@token = PASTE_YOUR_ACCESS_TOKEN_HERE
+@adminToken = PASTE_ADMIN_ACCESS_TOKEN_HERE
+@skillId = PASTE_SKILL_UUID_HERE
+
+### ─── Regular User Actions ───
+
+### Search for a skill by typing a letter
+GET {{baseUrl}}/skills/search?q=r
+Authorization: Bearer {{token}}
+
+### Search for a skill with a partial word (like "py" for python)
+GET {{baseUrl}}/skills/search?q=py
+Authorization: Bearer {{token}}
+
+### Show the top 10 most popular skills (no search query)
+GET {{baseUrl}}/skills/search
+Authorization: Bearer {{token}}
+
+### Search for a skill using an alias (like "JS" for JavaScript)
+GET {{baseUrl}}/skills/search?q=JS
+Authorization: Bearer {{token}}
+
+### Test: Try to search without logging in
+GET {{baseUrl}}/skills/search?q=java
+
+
+### Suggest a new skill to the platform
+POST {{baseUrl}}/skills
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Darija marocaine",
+  "category": "languages"
+}
+
+### Suggesting the exact same skill will just return the existing one
+POST {{baseUrl}}/skills
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Darija marocaine",
+  "category": "languages"
+}
+
+### Test: Try to suggest a skill with a category that doesn't exist
+POST {{baseUrl}}/skills
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Some Skill",
+  "category": "music"
+}
+
+### Test: Try to suggest a skill with a very short name
+POST {{baseUrl}}/skills
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "A",
+  "category": "tech"
+}
+
+
+### ─── Admin Actions ───
+
+### View all skills in the database
+GET {{baseUrl}}/skills
+Authorization: Bearer {{adminToken}}
+
+### View skills that are waiting for admin approval
+GET {{baseUrl}}/skills?status=pending_review
+Authorization: Bearer {{adminToken}}
+
+### View skills that have been approved
+GET {{baseUrl}}/skills?status=approved
+Authorization: Bearer {{adminToken}}
+
+### View skills that have been rejected
+GET {{baseUrl}}/skills?status=rejected
+Authorization: Bearer {{adminToken}}
+
+### View pending skills (Page 1)
+GET {{baseUrl}}/skills?status=pending_review&page=1&limit=10
+Authorization: Bearer {{adminToken}}
+
+### Test: Try to view all skills using a normal user account
+GET {{baseUrl}}/skills
+Authorization: Bearer {{token}}
+
+### Quick shortcut to get all pending skills
+GET {{baseUrl}}/skills/pending
+Authorization: Bearer {{adminToken}}
+
+
+### Approve a pending skill
+PATCH {{baseUrl}}/skills/{{skillId}}/approve
+Authorization: Bearer {{adminToken}}
+
+### Test: Try to approve a skill that is already approved
+PATCH {{baseUrl}}/skills/{{skillId}}/approve
+Authorization: Bearer {{adminToken}}
+
+### Test: Try to approve a skill using a normal user account
+PATCH {{baseUrl}}/skills/{{skillId}}/approve
+Authorization: Bearer {{token}}
+
+
+### Reject a skill with a reason
+PATCH {{baseUrl}}/skills/{{skillId}}/reject
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "reason": "Doublon avec une compétence existante."
+}
+
+### Reject a skill without giving a reason
+PATCH {{baseUrl}}/skills/{{skillId}}/reject
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{}
+
+### Test: Try to reject a skill using a normal user account
+PATCH {{baseUrl}}/skills/{{skillId}}/reject
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{}
+
+
+### Add alternative names (aliases) to a skill to help search
+PATCH {{baseUrl}}/skills/{{skillId}}/aliases
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "aliases": ["JS", "ECMAScript", "Vanilla JS"]
+}
+
+### Remove all alternative names from a skill
+PATCH {{baseUrl}}/skills/{{skillId}}/aliases
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "aliases": []
+}

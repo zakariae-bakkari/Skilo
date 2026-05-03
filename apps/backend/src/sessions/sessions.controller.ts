@@ -16,6 +16,7 @@ import { SessionsService } from './sessions.service';
 import { ProposeSessionDto } from './dto/propose-session.dto';
 import { ConfirmSessionDto } from './dto/confirm-session.dto';
 import { DeclineCancelDto, SessionFilterDto } from './dto/session-filter.dto';
+import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RequestWithUser } from '../auth/types/request-with-user.type';
 
@@ -83,5 +84,23 @@ export class SessionsController {
     @Request() req: RequestWithUser,
   ) {
     return this.sessionsService.confirm(id, req.user.sub, dto);
+  }
+
+  @Get(':id/messages')
+  getMessages(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.sessionsService.getMessages(id, req.user.sub);
+  }
+
+  @Post(':id/messages')
+  @HttpCode(HttpStatus.CREATED)
+  createMessage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateMessageDto,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.sessionsService.createMessage(id, req.user.sub, dto);
   }
 }

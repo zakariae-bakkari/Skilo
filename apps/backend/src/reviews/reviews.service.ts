@@ -132,7 +132,10 @@ export class ReviewsService {
         data: {
           userId: revieweeId,
           type: 'review_received',
-          payload: { sessionId: dto.sessionId },
+          payload: { 
+            sessionId: dto.sessionId,
+            body: 'Vous avez reçu un nouvel avis ! Les deux évaluations sont maintenant visibles.'
+          },
         },
       });
     }

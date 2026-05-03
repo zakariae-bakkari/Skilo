@@ -98,6 +98,7 @@ export class CreditsService {
           type: 'credits_earned',
           payload: {
             message: `Attention, votre solde atteint le plafond de ${CREDIT_CAP} crédits. ${surplus} crédit(s) seront perdus.`,
+            body: `Plafond atteint : ${surplus} crédit(s) non crédités`,
             surplus,
           },
         },
@@ -128,6 +129,7 @@ export class CreditsService {
         type: 'credits_earned',
         payload: {
           message: `Vous avez gagné ${actualAmount} crédit(s) suite à votre session.`,
+          body: `Vous avez gagné ${actualAmount} crédit(s)`,
           amount: actualAmount,
           sessionId,
         },
@@ -171,6 +173,7 @@ export class CreditsService {
         type: 'credits_refunded',
         payload: {
           message: `${amount} crédit(s) remboursé(s) suite à l'annulation de la session.`,
+          body: `${amount} crédit(s) remboursés`,
           amount,
           sessionId,
         },

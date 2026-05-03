@@ -16,7 +16,7 @@ import { MatchingModule } from 'src/matching/matching.module';
       useFactory: (config: ConfigService) => ({
         global: true,
         secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' }, // Access token: 15 minutes
+        signOptions: { expiresIn: '60m' }, // Access token: 15 minutes
       }),
     }),
     forwardRef(() => MatchingModule),

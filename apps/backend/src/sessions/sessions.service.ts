@@ -10,20 +10,14 @@ import { CreditsService } from '../credits/credits.service';
 import { ProposeSessionDto } from './dto/propose-session.dto';
 import { ConfirmSessionDto } from './dto/confirm-session.dto';
 import { DeclineCancelDto, SessionFilterDto } from './dto/session-filter.dto';
+import { CreateMessageDto } from './dto/create-message.dto';
+import { NotificationType } from 'generated/prisma/client';
 
 // Shared select for the "other user" in a session card
-const SESSION_USER_SELECT = {
-  id: true,
-  firstName: true,
-  avatarUrl: true,
-};
+const SESSION_USER_SELECT = { id: true, firstName: true, lastName: true, avatarUrl: true };
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const SESSION_SKILL_SELECT = {
-  id: true,
-  name: true,
-  category: true,
-};
+const SESSION_SKILL_SELECT = { id: true, name: true, category: true };
 
 @Injectable()
 export class SessionsService {
@@ -37,80 +31,40 @@ export class SessionsService {
   // ══════════════════════════════════════════════════════════════════════════
   async propose(initiatorId: string, dto: ProposeSessionDto) {
     const scheduledAt = new Date(dto.scheduledAt);
-    const now = new Date();
 
-    // Rule: at least 2 hours from now
-    const minDate = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-    if (scheduledAt < minDate) {
-      throw new BadRequestException(
-        "La session doit être proposée au moins 2 heures à l'avance.",
-      );
-    }
+    this.validateSessionDate(scheduledAt);
+    await this.ensureActiveSessionLimit(initiatorId, dto.recipientId);
 
-    // Rule: at most 30 days from now
-    const maxDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    if (scheduledAt > maxDate) {
-      throw new BadRequestException(
-        'La session ne peut pas être planifiée à plus de 30 jours.',
-      );
-    }
+    const match = await this.getActiveMatchOrThrow(
+      initiatorId,
+      dto.recipientId,
+    );
 
-    // Rule: no existing pending/confirmed session between these two users
-    const existing = await this.prisma.session.findFirst({
-      where: {
-        status: { in: ['pending', 'confirmed'] },
-        OR: [
-          { proposedById: initiatorId, recipientId: dto.recipientId },
-          { proposedById: dto.recipientId, recipientId: initiatorId },
-        ],
-      },
-    });
-    if (existing) {
-      throw new ConflictException(
-        'Une session est déjà en cours avec cet utilisateur.',
-      );
-    }
-
-    // Find the match between the two users — required by schema (matchId is not nullable)
-    const match = await this.prisma.match.findFirst({
-      where: {
-        status: 'active',
-        OR: [
-          { userAId: initiatorId, userBId: dto.recipientId },
-          { userAId: dto.recipientId, userBId: initiatorId },
-        ],
-      },
-    });
-
-    if (!match) {
-      throw new BadRequestException(
-        'Aucun match actif trouvé avec cet utilisateur.',
-      );
-    }
-
-    // Calculate credits needed
     const creditsNeeded = CreditsService.creditsForDuration(dto.duration);
-    // Credits required only for partial matches (not perfect — exchange is mutual)
     const isCreditBased = match.type === 'partial';
 
     if (isCreditBased) {
-      // reserve() will throw 400 with the exact message if balance is insufficient
       await this.creditsService.reserve(initiatorId, creditsNeeded, 'pending');
     }
 
-    // Create the session
+    const offeredSkill = await this.prisma.skillCatalog.findUnique({ where: { id: dto.offeredSkillId } });
+    const wantedSkill = await this.prisma.skillCatalog.findUnique({ where: { id: dto.wantedSkillId } });
+
     const session = await this.prisma.session.create({
       data: {
-        matchId: match.id, // guaranteed non-null — we threw above if missing
+        matchId: match.id,
         proposedById: initiatorId,
         recipientId: dto.recipientId,
         scheduledAt,
         durationMinutes: dto.duration,
         skillsExchanged: [
-          { skillCatalogId: dto.offeredSkillId, role: 'offered' },
-          { skillCatalogId: dto.wantedSkillId, role: 'wanted' },
+          { 
+            offeredSkillName: offeredSkill?.name ?? 'Compétence', 
+            wantedSkillName: wantedSkill?.name ?? 'Compétence' 
+          }
         ],
         message: dto.message ?? null,
+        meetingLink: dto.meetingLink ?? null,
         status: 'pending',
         creditsUsed: isCreditBased ? creditsNeeded : 0,
         confirmationDeadline: new Date(
@@ -122,10 +76,20 @@ export class SessionsService {
         status: true,
         scheduledAt: true,
         durationMinutes: true,
+        meetingLink: true,
       },
     });
 
-    // If credits were reserved with a placeholder sessionId, update it now
+    // Generate meeting link if not provided
+    if (!session.meetingLink) {
+      const generatedLink = `https://meet.ffmuc.net/skilo-${session.id}`;
+      await this.prisma.session.update({
+        where: { id: session.id },
+        data: { meetingLink: generatedLink },
+      });
+      (session as any).meetingLink = generatedLink;
+    }
+
     if (isCreditBased) {
       await this.prisma.creditTransaction.updateMany({
         where: { userId: initiatorId, sessionId: 'pending' },
@@ -133,24 +97,97 @@ export class SessionsService {
       });
     }
 
-    // Notify recipient
+    await this.notifyUser(
+      dto.recipientId,
+      initiatorId,
+      session.id,
+      'session_proposed',
+      { 
+        scheduledAt: scheduledAt.toISOString(),
+        body: "Vous avez reçu une nouvelle demande de session d'échange." 
+      },
+    );
+
+    return { message: 'Session proposée avec succès.', session };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Validation Helpers
+  // ══════════════════════════════════════════════════════════════════════════
+  private validateSessionDate(scheduledAt: Date) {
+    const now = new Date();
+    const minDate = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    if (scheduledAt < minDate) {
+      throw new BadRequestException(
+        "La session doit être proposée au moins 2 heures à l'avance.",
+      );
+    }
+    const maxDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    if (scheduledAt > maxDate) {
+      throw new BadRequestException(
+        'La session ne peut pas être planifiée à plus de 30 jours.',
+      );
+    }
+  }
+
+  private async ensureActiveSessionLimit(userAId: string, userBId: string) {
+    const activeCount = await this.prisma.session.count({
+      where: {
+        status: { in: ['pending', 'confirmed'] },
+        OR: [
+          { proposedById: userAId, recipientId: userBId },
+          { proposedById: userBId, recipientId: userAId },
+        ],
+      },
+    });
+
+    if (activeCount >= 3) {
+      throw new ConflictException(
+        'Vous avez déjà 3 sessions actives avec cet utilisateur. Veuillez en terminer une avant d\'en proposer une nouvelle.',
+      );
+    }
+  }
+
+  private async getActiveMatchOrThrow(userAId: string, userBId: string) {
+    const match = await this.prisma.match.findFirst({
+      where: {
+        status: 'active',
+        OR: [
+          { userAId, userBId },
+          { userAId: userBId, userBId: userAId },
+        ],
+      },
+    });
+    if (!match) {
+      throw new BadRequestException(
+        'Aucun match actif trouvé avec cet utilisateur.',
+      );
+    }
+    return match;
+  }
+
+  private async notifyUser(
+    targetUserId: string,
+    fromUserId: string,
+    sessionId: string,
+    type: NotificationType,
+    extraPayload: any = {},
+  ) {
     const initiator = await this.prisma.user.findUnique({
-      where: { id: initiatorId },
+      where: { id: fromUserId },
       select: { firstName: true },
     });
     await this.prisma.notification.create({
       data: {
-        userId: dto.recipientId,
-        type: 'session_proposed',
+        userId: targetUserId,
+        type,
         payload: {
           fromUserFirstName: initiator?.firstName,
-          sessionId: session.id,
-          scheduledAt: scheduledAt.toISOString(),
+          sessionId,
+          ...extraPayload,
         },
       },
     });
-
-    return { message: 'Session proposée avec succès.', session };
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -166,7 +203,6 @@ export class SessionsService {
       );
     }
 
-    // If credit-based → debit the reserved credits now
     if (session.creditsUsed > 0) {
       await this.creditsService.debit(
         session.proposedById,
@@ -180,22 +216,16 @@ export class SessionsService {
       data: { status: 'confirmed' },
     });
 
-    // Notify initiator
-    const recipient = await this.prisma.user.findUnique({
-      where: { id: recipientId },
-      select: { firstName: true },
-    });
-    await this.prisma.notification.create({
-      data: {
-        userId: session.proposedById,
-        type: 'session_accepted',
-        payload: {
-          fromUserFirstName: recipient?.firstName,
-          sessionId,
-          scheduledAt: session.scheduledAt.toISOString(),
-        },
+    await this.notifyUser(
+      session.proposedById,
+      recipientId,
+      sessionId,
+      'session_accepted',
+      { 
+        scheduledAt: session.scheduledAt.toISOString(),
+        body: "Votre demande de session a été acceptée !"
       },
-    });
+    );
 
     return { message: 'Session acceptée.' };
   }
@@ -211,7 +241,6 @@ export class SessionsService {
       throw new BadRequestException('Cette session ne peut plus être refusée.');
     }
 
-    // Refund reserved credits if applicable
     if (session.creditsUsed > 0) {
       await this.creditsService.refund(
         session.proposedById,
@@ -225,21 +254,16 @@ export class SessionsService {
       data: { status: 'cancelled', cancellationReason: dto.reason ?? null },
     });
 
-    const recipient = await this.prisma.user.findUnique({
-      where: { id: recipientId },
-      select: { firstName: true },
-    });
-    await this.prisma.notification.create({
-      data: {
-        userId: session.proposedById,
-        type: 'session_declined',
-        payload: {
-          fromUserFirstName: recipient?.firstName,
-          sessionId,
-          reason: dto.reason ?? null,
-        },
+    await this.notifyUser(
+      session.proposedById,
+      recipientId,
+      sessionId,
+      'session_declined',
+      { 
+        reason: dto.reason ?? null,
+        body: 'Votre demande de session a été déclinée.'
       },
-    });
+    );
 
     return { message: 'Session refusée.' };
   }
@@ -258,22 +282,15 @@ export class SessionsService {
       throw new BadRequestException('Cette session ne peut plus être annulée.');
     }
 
-    // Warning if < 2h before scheduled time
     const twoHoursBefore = new Date(
       session.scheduledAt.getTime() - 2 * 60 * 60 * 1000,
     );
     const isLateCancel = new Date() > twoHoursBefore;
 
-    // Refund credits if session was credit-based and not yet debited
-    if (session.creditsUsed > 0 && session.status === 'pending') {
-      await this.creditsService.refund(
-        session.proposedById,
-        session.creditsUsed,
-        sessionId,
-      );
-    }
-    // If confirmed + credit-based → refund too (session never happened)
-    if (session.creditsUsed > 0 && session.status === 'confirmed') {
+    if (
+      session.creditsUsed > 0 &&
+      (session.status === 'pending' || session.status === 'confirmed')
+    ) {
       await this.creditsService.refund(
         session.proposedById,
         session.creditsUsed,
@@ -290,17 +307,19 @@ export class SessionsService {
       },
     });
 
-    // Notify the OTHER participant
     const otherUserId =
       session.proposedById === userId
         ? session.recipientId
         : session.proposedById;
-
     await this.prisma.notification.create({
       data: {
         userId: otherUserId,
         type: 'session_cancelled',
-        payload: { sessionId, reason: dto.reason ?? null },
+        payload: { 
+          sessionId, 
+          reason: dto.reason ?? null,
+          body: 'Une session planifiée a été annulée.'
+        },
       },
     });
 
@@ -331,7 +350,6 @@ export class SessionsService {
     const isRecipient = session.recipientId === userId;
     if (!isInitiator && !isRecipient) throw new ForbiddenException();
 
-    // Update the right confirmation flag
     const updateData = isInitiator
       ? { confirmedByA: dto.didHappen }
       : { confirmedByB: dto.didHappen };
@@ -349,16 +367,13 @@ export class SessionsService {
       },
     });
 
-    // Evaluate state matrix
     const { confirmedByA, confirmedByB } = updated;
     const bothAnswered = confirmedByA !== null && confirmedByB !== null;
 
     if (bothAnswered) {
       if (confirmedByA && confirmedByB) {
-        // ✅ Both said yes → completed
         await this.completeSession(sessionId, updated);
       } else if (!confirmedByA && !confirmedByB) {
-        // ❌ Both said no → cancelled
         await this.prisma.session.update({
           where: { id: sessionId },
           data: { status: 'cancelled' },
@@ -371,12 +386,10 @@ export class SessionsService {
           );
         }
       } else {
-        // ⚠️ One yes, one no → disputed
         await this.prisma.session.update({
           where: { id: sessionId },
           data: { status: 'disputed' },
         });
-        // Notify both users about the dispute
         await this.prisma.notification.createMany({
           data: [
             {
@@ -426,21 +439,17 @@ export class SessionsService {
           skillsExchanged: true,
           proposedBy: { select: SESSION_USER_SELECT },
           recipient: { select: SESSION_USER_SELECT },
+          reviews: { select: { reviewerId: true } },
         },
       }),
       this.prisma.session.count({ where }),
     ]);
 
-    // Shape response — resolve "other" user from the current user's perspective
     const shaped = sessions.map((s) => ({
-      id: s.id,
-      status: s.status,
-      scheduledAt: s.scheduledAt,
-      durationMinutes: s.durationMinutes,
-      creditsUsed: s.creditsUsed,
-      skillsExchanged: s.skillsExchanged,
-      otherUser: s.proposedBy.id === userId ? s.recipient : s.proposedBy,
-      isInitiator: s.proposedBy.id === userId,
+      ...s,
+      // Keep proposedBy and recipient for the frontend
+      proposedBy: s.proposedBy,
+      recipient: s.recipient,
     }));
 
     return {
@@ -500,36 +509,37 @@ export class SessionsService {
       data: { status: isAutoCompleted ? 'auto_completed' : 'completed' },
     });
 
-    // Credit the teacher (recipient taught, so initiator was the learner)
-    // The INITIATOR wanted to learn → they paid credits (if credit-based)
-    // The RECIPIENT taught → they earn credits
     const creditsEarned = CreditsService.creditsForDuration(
       session.durationMinutes,
     );
     await this.creditsService.credit(
-      session.recipientId, // teacher = recipient
+      session.recipientId,
       creditsEarned,
       sessionId,
     );
 
-    // Update sessionsCompleted counter on both users
     await this.prisma.user.updateMany({
       where: { id: { in: [session.proposedById, session.recipientId] } },
       data: { sessionsCompleted: { increment: 1 } },
     });
 
-    // Notify both to submit their reviews
     await this.prisma.notification.createMany({
       data: [
         {
           userId: session.proposedById,
           type: 'session_completed',
-          payload: { sessionId },
+          payload: { 
+            sessionId,
+            body: "Votre session d'échange est maintenant terminée. N'oubliez pas de laisser un avis !"
+          },
         },
         {
           userId: session.recipientId,
           type: 'session_completed',
-          payload: { sessionId },
+          payload: { 
+            sessionId,
+            body: "Votre session d'échange est maintenant terminée. N'oubliez pas de laisser un avis !"
+          },
         },
       ],
     });
@@ -553,5 +563,70 @@ export class SessionsService {
     });
     if (!session) throw new NotFoundException('Session not found');
     return session;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // GET /sessions/:id/messages
+  // ══════════════════════════════════════════════════════════════════════════
+  async getMessages(sessionId: string, userId: string) {
+    const session = await this.findSessionOrThrow(sessionId);
+    
+    if (session.proposedById !== userId && session.recipientId !== userId) {
+      throw new ForbiddenException();
+    }
+
+    const messages = await this.prisma.message.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          }
+        }
+      }
+    });
+
+    return messages;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // POST /sessions/:id/messages
+  // ══════════════════════════════════════════════════════════════════════════
+  async createMessage(sessionId: string, userId: string, dto: CreateMessageDto) {
+    const session = await this.findSessionOrThrow(sessionId);
+
+    if (session.proposedById !== userId && session.recipientId !== userId) {
+      throw new ForbiddenException();
+    }
+
+    if (!['pending', 'confirmed'].includes(session.status)) {
+      throw new BadRequestException('Vous ne pouvez envoyer des messages que dans les sessions en attente ou confirmées.');
+    }
+
+    const message = await this.prisma.message.create({
+      data: {
+        sessionId,
+        senderId: userId,
+        content: dto.content,
+        imageUrl: dto.imageUrl,
+        isMeetingLinkSuggestion: dto.isMeetingLinkSuggestion ?? false,
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          }
+        }
+      }
+    });
+
+    return message;
   }
 }

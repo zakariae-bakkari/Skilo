@@ -11,6 +11,24 @@ const LEVEL_ORDER: Record<SkillLevel, number> = {
   advanced: 2,
 };
 
+type UserSkill = {
+  skillCatalogId: string;
+  type: string;
+  level: SkillLevel;
+  skillCatalog: { id: string; name: string; category: string };
+};
+
+type PerfectPair = {
+  offeredByA: { id: string; name: string; level: SkillLevel };
+  offeredByB: { id: string; name: string; level: SkillLevel };
+  levelScore: number;
+};
+
+type PartialMatch = {
+  offeredByA: { id: string; name: string; level: SkillLevel };
+  levelScore: number;
+};
+
 @Injectable()
 export class MatchingService {
   private readonly logger = new Logger(MatchingService.name);
@@ -19,17 +37,68 @@ export class MatchingService {
 
   // ══════════════════════════════════════════════════════════════════════════
   // CORE ALGORITHM — recalculateForUser(userId)
-  //
-  // Called:
-  //   - after login
-  //   - after profile update (PATCH /users/me)
-  //   - after skill add/remove
-  //   - every hour by the cron job (MatchingJob)
-  //   - manually via POST /matches/recalculate (admin)
   // ══════════════════════════════════════════════════════════════════════════
   async recalculateForUser(userId: string): Promise<void> {
-    // 1. Fetch user A's skills
-    const userA = await this.prisma.user.findUnique({
+    const userA = await this.getUserWithSkills(userId);
+    if (!userA) return;
+
+    const { offered: aOffered, wanted: aWanted } = this.splitSkills(
+      userA.skills,
+    );
+    if (aOffered.length === 0 && aWanted.length === 0) return;
+
+    const candidates = await this.getCandidates(userId);
+    const blockedUserIds = await this.getBlockedUserIds(userId);
+
+    for (const userB of candidates) {
+      if (blockedUserIds.has(userB.id)) continue;
+
+      const { offered: bOffered, wanted: bWanted } = this.splitSkills(
+        userB.skills,
+      );
+
+      // ── 1. Find perfect matches ─────────────────────────────────────────
+      const perfectPairs = this.findPerfectMatches(
+        aOffered,
+        aWanted,
+        bOffered,
+        bWanted,
+      );
+
+      // ── 2. Find partial matches if no perfect match exists ──────────────
+      let partialSkills: PartialMatch[] = [];
+      if (perfectPairs.length === 0) {
+        partialSkills = this.findPartialMatches(
+          aOffered,
+          aWanted,
+          bOffered,
+          bWanted,
+        );
+      }
+
+      // ── 3. Skip if no match at all ──────────────────────────────────────
+      if (perfectPairs.length === 0 && partialSkills.length === 0) {
+        await this.archiveMatchIfExists(userId, userB.id);
+        continue;
+      }
+
+      // ── 4. Calculate score and upsert ───────────────────────────────────
+      const matchDetails = this.calculateMatchDetails(
+        perfectPairs,
+        partialSkills,
+      );
+      await this.upsertMatch(userId, userB.id, matchDetails);
+    }
+
+    this.logger.log(`Matching recalculated for user ${userId}`);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // REFACTORED PROCESS HELPERS FOR RECALCULATE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  private async getUserWithSkills(userId: string) {
+    return this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -38,27 +107,16 @@ export class MatchingService {
             skillCatalogId: true,
             type: true,
             level: true,
-            skillCatalog: { select: { category: true } },
+            skillCatalog: { select: { id: true, category: true, name: true } },
           },
         },
       },
     });
+  }
 
-    if (!userA) return;
-
-    const aOffered = userA.skills.filter((s) => s.type === 'offered');
-    const aWanted = userA.skills.filter((s) => s.type === 'wanted');
-
-    // Nothing to match against if user has no skills at all
-    if (aOffered.length === 0 && aWanted.length === 0) return;
-
-    // 2. Fetch all OTHER active, onboarded users with their skills
-    const candidates = await this.prisma.user.findMany({
-      where: {
-        id: { not: userId },
-        isActive: true,
-        isOnboarded: true,
-      },
+  private async getCandidates(userId: string) {
+    return this.prisma.user.findMany({
+      where: { id: { not: userId }, isActive: true, isOnboarded: true },
       select: {
         id: true,
         skills: {
@@ -66,13 +124,14 @@ export class MatchingService {
             skillCatalogId: true,
             type: true,
             level: true,
-            skillCatalog: { select: { category: true } },
+            skillCatalog: { select: { id: true, category: true, name: true } },
           },
         },
       },
     });
+  }
 
-    // 3. Find existing active sessions — skip those pairs (FC-03-A rule)
+  private async getBlockedUserIds(userId: string): Promise<Set<string>> {
     const activeSessions = await this.prisma.session.findMany({
       where: {
         status: { in: ['pending', 'confirmed'] },
@@ -81,162 +140,158 @@ export class MatchingService {
       select: { proposedById: true, recipientId: true },
     });
 
-    // Build a Set of user IDs that already have an active session with A
-    const blockedUserIds = new Set<string>(
+    return new Set(
       activeSessions.map((s) =>
         s.proposedById === userId ? s.recipientId : s.proposedById,
       ),
     );
+  }
 
-    // 4. Process each candidate
-    for (const userB of candidates) {
-      if (blockedUserIds.has(userB.id)) continue;
+  private splitSkills(skills: any[]) {
+    return {
+      offered: skills.filter((s) => s.type === 'offered') as UserSkill[],
+      wanted: skills.filter((s) => s.type === 'wanted') as UserSkill[],
+    };
+  }
 
-      const bOffered = userB.skills.filter((s) => s.type === 'offered');
-      const bWanted = userB.skills.filter((s) => s.type === 'wanted');
-
-      // ── Find perfect match pairs ──────────────────────────────────────────
-      // A offers X AND B wants X  +  B offers Y AND A wants Y
-      const perfectPairs: {
-        offeredByA: string;
-        offeredByB: string;
-        levelScore: number;
-      }[] = [];
-
-      for (const ao of aOffered) {
-        for (const bw of bWanted) {
-          if (ao.skillCatalogId !== bw.skillCatalogId) continue;
-
-          // This skill is offered by A and wanted by B — now check the reverse
-          for (const bo of bOffered) {
-            for (const aw of aWanted) {
-              if (bo.skillCatalogId !== aw.skillCatalogId) continue;
-
-              // Perfect pair found: A offers ao ↔ B offers bo
-              const levelScore = this.levelBonus(ao.level, bw.level);
-              perfectPairs.push({
-                offeredByA: ao.skillCatalogId,
-                offeredByB: bo.skillCatalogId,
-                levelScore,
-              });
-            }
+  private findPerfectMatches(
+    aOffered: UserSkill[],
+    aWanted: UserSkill[],
+    bOffered: UserSkill[],
+    bWanted: UserSkill[],
+  ): PerfectPair[] {
+    const perfectPairs: PerfectPair[] = [];
+    for (const ao of aOffered) {
+      for (const bw of bWanted) {
+        if (ao.skillCatalogId !== bw.skillCatalogId) continue;
+        for (const bo of bOffered) {
+          for (const aw of aWanted) {
+            if (bo.skillCatalogId !== aw.skillCatalogId) continue;
+            perfectPairs.push({
+              offeredByA: {
+                id: ao.skillCatalogId,
+                name: ao.skillCatalog.name,
+                level: ao.level,
+              },
+              offeredByB: {
+                id: bo.skillCatalogId,
+                name: bo.skillCatalog.name,
+                level: bo.level,
+              },
+              levelScore: this.levelBonus(ao.level, bw.level),
+            });
           }
         }
       }
+    }
+    return perfectPairs;
+  }
 
-      // ── Find partial match skills ──────────────────────────────────────────
-      // B offers something A wants, BUT B wants nothing that A offers
-      const partialSkills: { skillCatalogId: string; levelScore: number }[] =
-        [];
+  private findPartialMatches(
+    aOffered: UserSkill[],
+    aWanted: UserSkill[],
+    bOffered: UserSkill[],
+    bWanted: UserSkill[],
+  ): PartialMatch[] {
+    const partialSkills: PartialMatch[] = [];
+    for (const bo of bOffered) {
+      const aWantsThis = aWanted.some(
+        (aw) => aw.skillCatalogId === bo.skillCatalogId,
+      );
+      if (!aWantsThis) continue;
 
-      if (perfectPairs.length === 0) {
-        // Only compute partial if there's no perfect match
-        for (const bo of bOffered) {
-          const aWantsThis = aWanted.some(
-            (aw) => aw.skillCatalogId === bo.skillCatalogId,
-          );
-          if (!aWantsThis) continue;
+      const bWantsAnythingAOffers = bWanted.some((bw) =>
+        aOffered.some((ao) => ao.skillCatalogId === bw.skillCatalogId),
+      );
+      if (bWantsAnythingAOffers) continue;
 
-          const bWantsAnythingAOffers = bWanted.some((bw) =>
-            aOffered.some((ao) => ao.skillCatalogId === bw.skillCatalogId),
-          );
-          if (bWantsAnythingAOffers) continue; // would be perfect — skip here
-
-          const aw = aWanted.find(
-            (aw) => aw.skillCatalogId === bo.skillCatalogId,
-          );
-          partialSkills.push({
-            skillCatalogId: bo.skillCatalogId,
-            levelScore: this.levelBonusPartial(bo.level, aw?.level),
-          });
-        }
-      }
-
-      // ── Skip if no match at all ───────────────────────────────────────────
-      if (perfectPairs.length === 0 && partialSkills.length === 0) {
-        // Archive existing match if it exists
-        await this.archiveMatchIfExists(userId, userB.id);
-        continue;
-      }
-
-      // ── Calculate score ───────────────────────────────────────────────────
-      let score = 0;
-      let matchType: MatchType;
-      let matchedPairs: object[];
-
-      if (perfectPairs.length > 0) {
-        matchType = MatchType.perfect;
-        score = perfectPairs.reduce((acc, p) => acc + 50 + p.levelScore, 0);
-        // Cap at 100
-        score = Math.min(score, 100);
-        matchedPairs = perfectPairs.map((p) => ({
-          offeredByA: p.offeredByA,
-          offeredByB: p.offeredByB,
-        }));
-      } else {
-        matchType = MatchType.partial;
-        score = partialSkills.reduce((acc, p) => acc + 40 + p.levelScore, 0);
-        score = Math.min(score, 100);
-        matchedPairs = partialSkills.map((p) => ({
-          skillCatalogId: p.skillCatalogId,
-        }));
-      }
-
-      const label = this.scoreToLabel(score);
-
-      // ── Canonical pair: always store smaller UUID as userAId ──────────────
-      // This guarantees the @@unique([userAId, userBId]) works correctly
-      const [canonicalA, canonicalB] =
-        userId < userB.id ? [userId, userB.id] : [userB.id, userId];
-
-      // ── Upsert the match ──────────────────────────────────────────────────
-      const existing = await this.prisma.match.findUnique({
-        where: {
-          userAId_userBId: { userAId: canonicalA, userBId: canonicalB },
+      const aw = aWanted.find((aw) => aw.skillCatalogId === bo.skillCatalogId);
+      partialSkills.push({
+        offeredByA: {
+          id: bo.skillCatalogId,
+          name: bo.skillCatalog.name,
+          level: bo.level,
         },
-        select: { id: true, type: true, status: true },
+        levelScore: this.levelBonusPartial(bo.level, aw?.level),
+      });
+    }
+    return partialSkills;
+  }
+
+  private calculateMatchDetails(
+    perfectPairs: PerfectPair[],
+    partialSkills: PartialMatch[],
+  ) {
+    let score = 0;
+    let matchType: MatchType;
+    let matchedPairs: object[];
+
+    if (perfectPairs.length > 0) {
+      matchType = MatchType.perfect;
+      score = perfectPairs.reduce((acc, p) => acc + 50 + p.levelScore, 0);
+      score = Math.min(score, 100);
+      matchedPairs = perfectPairs.map((p) => ({
+        offeredByA: p.offeredByA,
+        offeredByB: p.offeredByB,
+      }));
+    } else {
+      matchType = MatchType.partial;
+      score = partialSkills.reduce((acc, p) => acc + 40 + p.levelScore, 0);
+      score = Math.min(score, 100);
+      matchedPairs = partialSkills.map((p) => ({
+        offeredByA: p.offeredByA,
+        // For partial matches, offeredByB might not exist in the same way, 
+        // but we provide a placeholder to avoid frontend crashes
+        offeredByB: { id: 'none', name: 'Any Skill', level: 'beginner' as SkillLevel },
+      }));
+    }
+    return { matchType, score, matchedPairs };
+  }
+
+  private async upsertMatch(
+    userAId: string,
+    userBId: string,
+    details: { matchType: MatchType; score: number; matchedPairs: object[] },
+  ) {
+    const { matchType, score, matchedPairs } = details;
+    const label = this.scoreToLabel(score);
+    const [canonicalA, canonicalB] =
+      userAId < userBId ? [userAId, userBId] : [userBId, userAId];
+
+    const existing = await this.prisma.match.findUnique({
+      where: { userAId_userBId: { userAId: canonicalA, userBId: canonicalB } },
+      select: { id: true, type: true, status: true },
+    });
+
+    if (existing) {
+      const wasNotPerfect = existing.type !== MatchType.perfect;
+      const isNowPerfect = matchType === MatchType.perfect;
+
+      await this.prisma.match.update({
+        where: { id: existing.id },
+        data: { type: matchType, score, label, matchedPairs, status: 'active' },
       });
 
-      if (existing) {
-        const wasNotPerfect = existing.type !== MatchType.perfect;
-        const isNowPerfect = matchType === MatchType.perfect;
+      if (wasNotPerfect && isNowPerfect) {
+        await this.sendMatchUpgradeNotification(userAId, userBId);
+      }
+    } else {
+      await this.prisma.match.create({
+        data: {
+          userAId: canonicalA,
+          userBId: canonicalB,
+          type: matchType,
+          score,
+          label,
+          matchedPairs,
+          status: 'active',
+        },
+      });
 
-        await this.prisma.match.update({
-          where: { id: existing.id },
-          data: {
-            type: matchType,
-            score,
-            label,
-            matchedPairs,
-            status: 'active',
-          },
-        });
-
-        // Notify if a partial match just became perfect (FC-03-B)
-        if (wasNotPerfect && isNowPerfect) {
-          await this.sendMatchUpgradeNotification(userId, userB.id);
-        }
-      } else {
-        await this.prisma.match.create({
-          data: {
-            userAId: canonicalA,
-            userBId: canonicalB,
-            type: matchType,
-            score,
-            label,
-            matchedPairs,
-            status: 'active',
-          },
-        });
-
-        // Notify A if a new perfect match was just created
-        if (matchType === MatchType.perfect) {
-          await this.sendNewPerfectMatchNotification(userId, userB.id);
-        }
+      if (matchType === MatchType.perfect) {
+        await this.sendNewPerfectMatchNotification(userAId, userBId);
       }
     }
-
-    this.logger.log(`Matching recalculated for user ${userId}`);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -247,15 +302,12 @@ export class MatchingService {
     const limit = filters.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    // Base where clause: matches where the user is A or B and status is active
     const baseWhere = {
       status: 'active' as const,
       OR: [{ userAId: userId }, { userBId: userId }],
-      // Filter by match type if provided
       ...(filters.type && { type: filters.type }),
     };
 
-    // Determine orderBy
     const orderBy = this.resolveOrderBy(filters.sort);
 
     const [matches, total] = await this.prisma.$transaction([
@@ -274,6 +326,7 @@ export class MatchingService {
             select: {
               id: true,
               firstName: true,
+              lastName: true,
               city: true,
               avatarUrl: true,
               avgRating: true,
@@ -294,6 +347,7 @@ export class MatchingService {
             select: {
               id: true,
               firstName: true,
+              lastName: true,
               city: true,
               avatarUrl: true,
               avgRating: true,
@@ -315,12 +369,10 @@ export class MatchingService {
       this.prisma.match.count({ where: baseWhere }),
     ]);
 
-    // Shape the response — the "other" user depends on which side the current user is
     const shaped = matches
       .map((match) => {
         const other = match.userA.id === userId ? match.userB : match.userA;
 
-        // Apply category filter if provided (filter on the matched skill pairs)
         if (filters.category) {
           const relevantSkills = other.skills.filter(
             (s) => s.skillCatalog.category === filters.category,
@@ -328,7 +380,6 @@ export class MatchingService {
           if (relevantSkills.length === 0) return null;
         }
 
-        // Apply level filter if provided
         if (filters.level) {
           const relevantSkills = other.skills.filter(
             (s) => s.level === filters.level,
@@ -337,15 +388,15 @@ export class MatchingService {
         }
 
         return {
-          matchId: match.id,
+          id: match.id,
           type: match.type,
           score: match.score,
           label: match.label,
-          // All matched pairs — frontend lets user pick which one to act on (Q2 decision)
           matchedPairs: match.matchedPairs,
-          user: {
+          otherUser: {
             id: other.id,
             firstName: other.firstName,
+            lastName: other.lastName,
             city: other.city,
             avatarUrl: other.avatarUrl,
             avgRating: other.avgRating,
@@ -355,9 +406,8 @@ export class MatchingService {
           },
         };
       })
-      .filter(Boolean); // remove nulls from category/level filtering
+      .filter(Boolean);
 
-    // Split into perfect first, then partial (FC-03-B spec)
     const perfect = shaped.filter((m) => m?.type === MatchType.perfect);
     const partial = shaped.filter((m) => m?.type === MatchType.partial);
 
@@ -390,6 +440,7 @@ export class MatchingService {
           select: {
             id: true,
             firstName: true,
+            lastName: true,
             city: true,
             avatarUrl: true,
             avgRating: true,
@@ -408,6 +459,7 @@ export class MatchingService {
           select: {
             id: true,
             firstName: true,
+            lastName: true,
             city: true,
             avatarUrl: true,
             avgRating: true,
@@ -427,13 +479,11 @@ export class MatchingService {
 
     if (!match) throw new Error('Match not found');
 
-    // Verify the requesting user is part of this match
     if (match.userA.id !== userId && match.userB.id !== userId) {
       throw new Error('Forbidden');
     }
 
     const other = match.userA.id === userId ? match.userB : match.userA;
-
     return { ...match, otherUser: other };
   }
 
@@ -441,33 +491,22 @@ export class MatchingService {
   // PRIVATE HELPERS
   // ══════════════════════════════════════════════════════════════════════════
 
-  // About match.status = active/archived (answer to zakariae's comment in schema):
-  // active  → the match is currently valid and shown to users
-  // archived → one of the two users deleted their skills or account — we don't
-  //            delete the match row (it might have sessions linked to it) but
-  //            we hide it from the list. This is why it's needed.
   private async archiveMatchIfExists(userAId: string, userBId: string) {
     const [canonicalA, canonicalB] =
       userAId < userBId ? [userAId, userBId] : [userBId, userAId];
 
     await this.prisma.match.updateMany({
-      where: {
-        userAId: canonicalA,
-        userBId: canonicalB,
-        status: 'active',
-      },
+      where: { userAId: canonicalA, userBId: canonicalB, status: 'active' },
       data: { status: 'archived' },
     });
   }
 
-  // Score thresholds from spec (FC-03-A)
   private scoreToLabel(score: number): string {
     if (score >= 70) return 'Très compatible';
     if (score >= 50) return 'Compatible';
     return 'Partiellement compatible';
   }
 
-  // Perfect match level bonus: +20 exact, +10 one step above (FC-03-A)
   private levelBonus(
     offeredLevel: SkillLevel,
     wantedLevel: SkillLevel,
@@ -478,7 +517,6 @@ export class MatchingService {
     return 0;
   }
 
-  // Partial match level bonus: +15 exact (FC-03-A)
   private levelBonusPartial(
     offeredLevel: SkillLevel,
     wantedLevel?: SkillLevel,
@@ -491,7 +529,7 @@ export class MatchingService {
     if (sort === 'rating') return { userA: { avgRating: 'desc' as const } };
     if (sort === 'sessions')
       return { userA: { sessionsCompleted: 'desc' as const } };
-    return { score: 'desc' as const }; // default
+    return { score: 'desc' as const };
   }
 
   // ─── Notifications ────────────────────────────────────────────────────────
@@ -499,7 +537,6 @@ export class MatchingService {
     userAId: string,
     userBId: string,
   ) {
-    // Notify BOTH users about the new perfect match
     const userB = await this.prisma.user.findUnique({
       where: { id: userBId },
       select: { firstName: true },
