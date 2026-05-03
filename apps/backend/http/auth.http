@@ -1,0 +1,86 @@
+@baseUrl = http://localhost:2006
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzOWU4YjUzNy1lZDhkLTQyOGItYTg4Yy1iZDM5Y2VlOWMwYzgiLCJlbWFpbCI6Im1lcmllbTIwMDRAZXhhbXBsZS5jb20iLCJmaXJzdE5hbWUiOiJtZXJpZW0iLCJsYXN0TmFtZSI6ImhhbXJpIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3Nzc3NDYxMjksImV4cCI6MTc3Nzc0NzAyOX0.qyCz2XMit56Z7ZSr1Pma61QEHww3wKbHJMYRHSuNRFE
+
+### Register a new user
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "meriem2004@example.com",
+  "password": "Password123",
+  "firstName": "meriem",
+  "lastName": "hamri"
+}
+
+### Login with existing user account
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "meriem2004@example.com",
+  "password": "Password123"
+}
+
+### Refresh your session token (uses the cookie automatically)
+POST {{baseUrl}}/auth/refresh
+
+### Logout to end your session
+POST {{baseUrl}}/auth/logout
+
+### Get your current profile (You need to set @token above)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### Test: Register with an invalid email format
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "invalid-email",
+  "password": "Password123",
+  "firstName": "Jane",
+  "lastName": "Smith"
+}
+
+### Test: Register with a weak password
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "jane.smith@example.com",
+  "password": "weak",
+  "firstName": "Jane",
+  "lastName": "Smith"
+}
+
+### Test: Access admin data
+GET {{baseUrl}}/auth/admin
+Content-Type: application/json 
+Authorization: Bearer {{token}}
+
+### Test: Register with an email that is already used
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "Password123",
+  "firstName": "John",
+  "lastName": "Duplicate"
+}
+
+### Test: Login with a wrong password
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "WrongPassword123"
+}
+
+### Test: Try to get profile without being logged in (no token)
+GET {{baseUrl}}/auth/me
+
+### Test: Try to get profile with a fake token
+GET {{baseUrl}}/auth/me
+Authorization: Bearer invalid_token_here

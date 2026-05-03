@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtGuard } from './guards/jwt.guard';
 import { BlacklistCleanupTask } from './tasks/blacklist-cleanup.task';
+import { MatchingModule } from 'src/matching/matching.module';
 
 @Module({
   imports: [
@@ -15,9 +16,10 @@ import { BlacklistCleanupTask } from './tasks/blacklist-cleanup.task';
       useFactory: (config: ConfigService) => ({
         global: true,
         secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' }, // Access token: 15 minutes
+        signOptions: { expiresIn: '60m' }, // Access token: 15 minutes
       }),
     }),
+    forwardRef(() => MatchingModule),
   ],
   providers: [AuthService, PrismaService, JwtGuard, BlacklistCleanupTask],
   controllers: [AuthController],

@@ -1,0 +1,17 @@
+@baseUrl = http://localhost:2006
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzOWU4YjUzNy1lZDhkLTQyOGItYTg4Yy1iZDM5Y2VlOWMwYzgiLCJlbWFpbCI6Im1lcmllbTIwMDRAZXhhbXBsZS5jb20iLCJmaXJzdE5hbWUiOiJtZXJpZW0iLCJsYXN0TmFtZSI6ImhhbXJpIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3Nzc3NDY0MDgsImV4cCI6MTc3Nzc0NzMwOH0.8ZRJEyupzLV2TFqihxa3NoBx1Ce6ejZo8UcRgbKN3HI
+
+### View your current credit balance (available, reserved, and total)
+GET {{baseUrl}}/credits/balance
+Authorization: Bearer {{token}}
+
+### View the full history of all your credit transactions
+GET {{baseUrl}}/credits/history
+Authorization: Bearer {{token}}
+
+### View your credit transaction history with pagination
+GET {{baseUrl}}/credits/history?page=1&limit=10
+Authorization: Bearer {{token}}
+
+### Test: Try to view your credit balance without logging in
+GET {{baseUrl}}/credits/balance

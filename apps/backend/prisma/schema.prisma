@@ -181,6 +181,7 @@ model User {
   creditTransactions CreditTransaction[]
   notifications      Notification[]
   skillsCreated      SkillCatalog[]      @relation("SkillCreatedBy")
+  messagesSent       Message[]           @relation("MessageSender")
 
   @@index([city], map: "idx_users_city")
   @@index([isActive], map: "idx_users_active")
@@ -314,6 +315,7 @@ model Session {
   cancelledBy        User?               @relation("SessionCancelledBy", fields: [cancelledById], references: [id])
   reviews            Review[]
   creditTransactions CreditTransaction[]
+  messages           Message[]
 
   @@index([matchId], map: "idx_sessions_match")
   @@index([proposedById], map: "idx_sessions_proposed_by")
@@ -411,4 +413,24 @@ model Notification {
   @@index([userId, createdAt(sort: Desc)], map: "idx_notif_user_all")
   @@index([type], map: "idx_notif_type")
   @@map("notifications")
+}
+
+// ============================================================
+// 10. MESSAGES
+// Integrated chat messages for confirmed sessions
+// ============================================================
+model Message {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId               String   @db.Uuid
+  senderId                String   @db.Uuid
+  content                 String?  @db.VarChar(1000)
+  imageUrl                String?  @db.VarChar(500)
+  isMeetingLinkSuggestion Boolean  @default(false)
+  createdAt               DateTime @default(now()) @db.Timestamptz()
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sender  User    @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt(sort: Asc)], map: "idx_messages_session")
+  @@map("messages")
 }
