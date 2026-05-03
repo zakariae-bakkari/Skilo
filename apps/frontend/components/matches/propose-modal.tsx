@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Match, sessionsApi, SkillCatalog } from '@/lib/api';
+import { Match, sessionsApi, SkillCatalogItem } from '@/lib/api';
 import {
   Dialog,
   DialogContent,

@@ -46,6 +46,11 @@ export interface SkillCatalogItem {
   usageCount: number;
 }
 
+export interface SkillEntry {
+  skillId: string;
+  level:   SkillLevel;
+}
+
 export interface UserSkill {
   id:            string;
   skillCatalogId: string;
@@ -356,8 +361,8 @@ export const usersApi = {
 // ─── Skills catalog API ───────────────────────────────────────────────────────
 
 export const skillsApi = {
-  search: (q: string) =>
-    get<SkillCatalogItem[]>(`/skills/search?q=${encodeURIComponent(q)}`),
+  search: (q?: string) =>
+    get<SkillCatalogItem[]>(`/skills/search${q ? `?q=${encodeURIComponent(q)}` : ''}`),
 
   findAll: (params?: { status?: string; page?: number; limit?: number }) => {
     const qs = new URLSearchParams();

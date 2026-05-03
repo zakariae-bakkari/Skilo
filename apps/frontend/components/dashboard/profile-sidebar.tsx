@@ -27,11 +27,8 @@ export function ProfileSidebar({ user }: { user: User | null }) {
         <p className="text-sm text-muted-foreground mb-4">{user.email}</p>
 
         <div className="flex flex-wrap justify-center gap-2 mb-6">
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <Award className="w-3 h-3" /> {user.role}
-          </Badge>
           <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200">
-            <CreditCard className="w-3 h-3" /> {user.credits} Credits
+            <CreditCard className="w-3 h-3" /> {user.creditBalance} Credits
           </Badge>
         </div>
 
