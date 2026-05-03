@@ -6,10 +6,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingDto } from './dto/onboarding.dto';
 import { SkillType } from 'generated/prisma/client';
+import { MatchingService } from 'src/matching/matching.service';
 
 @Injectable()
 export class OnboardingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly matchingService: MatchingService,
+  ) {}
 
   // ─── GET /onboarding/status ───────────────────────────────────────────────
   async getStatus(userId: string) {
@@ -152,6 +156,8 @@ export class OnboardingService {
         },
       },
     });
+
+    this.matchingService.recalculateForUser(userId).catch(() => {});
 
     return {
       message: 'Onboarding completed successfully',

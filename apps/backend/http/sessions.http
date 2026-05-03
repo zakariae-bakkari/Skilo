@@ -1,0 +1,192 @@
+@baseUrl = http://localhost:2006
+@token = PASTE_USER_A_TOKEN
+@tokenB = PASTE_USER_B_TOKEN
+@sessionId = PASTE_SESSION_UUID
+@matchId = PASTE_MATCH_UUID
+@skillA = PASTE_SKILL_ID_YOU_OFFER
+@skillB = PASTE_SKILL_ID_THEY_OFFER
+
+
+### ─── 1. Propose a Session ───
+
+### Propose a new session to another user
+POST {{baseUrl}}/sessions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "recipientId": "4ad84843-d5e9-4dc9-bc7f-18003d929281",
+  "scheduledAt": "2026-05-01T14:00:00.000Z",
+  "duration": 60,
+  "offeredSkillId": "{{skillA}}",
+  "wantedSkillId": "{{skillB}}",
+  "message": "Salut ! Tu m'apprends React, je t'apprends Python ?"
+}
+
+### Test: Try to schedule a session too soon (less than 2 hours from now)
+POST {{baseUrl}}/sessions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "recipientId": "4ad84843-d5e9-4dc9-bc7f-18003d929281",
+  "scheduledAt": "2026-04-13T15:00:00.000Z",
+  "duration": 60,
+  "offeredSkillId": "{{skillA}}",
+  "wantedSkillId": "{{skillB}}"
+}
+
+### Test: Try to schedule a session too far in the future (more than 30 days)
+POST {{baseUrl}}/sessions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "recipientId": "4ad84843-d5e9-4dc9-bc7f-18003d929281",
+  "scheduledAt": "2026-07-01T14:00:00.000Z",
+  "duration": 60,
+  "offeredSkillId": "{{skillA}}",
+  "wantedSkillId": "{{skillB}}"
+}
+
+### Test: Try to propose a session when you already have one pending with this user
+POST {{baseUrl}}/sessions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "recipientId": "4ad84843-d5e9-4dc9-bc7f-18003d929281",
+  "scheduledAt": "2026-05-02T10:00:00.000Z",
+  "duration": 30,
+  "offeredSkillId": "{{skillA}}",
+  "wantedSkillId": "{{skillB}}"
+}
+
+### Test: Try to propose a session with an invalid duration (like 45 minutes)
+POST {{baseUrl}}/sessions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "recipientId": "4ad84843-d5e9-4dc9-bc7f-18003d929281",
+  "scheduledAt": "2026-05-01T14:00:00.000Z",
+  "duration": 45,
+  "offeredSkillId": "{{skillA}}",
+  "wantedSkillId": "{{skillB}}"
+}
+
+
+### ─── 2. View Sessions ───
+
+### View all your upcoming sessions
+GET {{baseUrl}}/sessions?tab=upcoming
+Authorization: Bearer {{token}}
+
+### View all your past sessions
+GET {{baseUrl}}/sessions?tab=past
+Authorization: Bearer {{token}}
+
+### View upcoming sessions with pagination
+GET {{baseUrl}}/sessions?tab=upcoming&page=1&limit=5
+Authorization: Bearer {{token}}
+
+### View details of a specific session
+GET {{baseUrl}}/sessions/{{sessionId}}
+Authorization: Bearer {{token}}
+
+### Test: Try to view a session that doesn't exist
+GET {{baseUrl}}/sessions/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+### Test: Try to view a session that belongs to someone else
+GET {{baseUrl}}/sessions/{{sessionId}}
+Authorization: Bearer {{tokenB}}
+
+
+### ─── 3. Accept or Decline a Proposal ───
+
+### Accept a session proposal (done by the recipient)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/accept
+Authorization: Bearer {{tokenB}}
+
+### Decline a session proposal with a reason
+PATCH {{baseUrl}}/sessions/{{sessionId}}/decline
+Content-Type: application/json
+Authorization: Bearer {{tokenB}}
+
+{
+  "reason": "Je ne suis pas disponible ce jour-là."
+}
+
+### Test: Try to accept your own session proposal
+PATCH {{baseUrl}}/sessions/{{sessionId}}/accept
+Authorization: Bearer {{token}}
+
+### Test: Try to accept a session that is already confirmed
+PATCH {{baseUrl}}/sessions/{{sessionId}}/accept
+Authorization: Bearer {{tokenB}}
+
+
+### ─── 4. Cancel a Session ───
+
+### Cancel a confirmed session (done by the initiator)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/cancel
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "reason": "Changement de planning."
+}
+
+### Cancel a confirmed session (done by the recipient, without a reason)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/cancel
+Content-Type: application/json
+Authorization: Bearer {{tokenB}}
+
+{}
+
+### Test: Try to cancel a session that is already cancelled
+PATCH {{baseUrl}}/sessions/{{sessionId}}/cancel
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{}
+
+
+### ─── 5. Confirm Session Completion ───
+
+### Confirm that the session happened (done by User A)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/confirm
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "didHappen": true
+}
+
+### Confirm that the session happened (done by User B -> Status becomes completed)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/confirm
+Content-Type: application/json
+Authorization: Bearer {{tokenB}}
+
+{
+  "didHappen": true
+}
+
+### Report a dispute: User A says yes, User B says no
+PATCH {{baseUrl}}/sessions/{{sessionId}}/confirm
+Content-Type: application/json
+Authorization: Bearer {{tokenB}}
+
+{
+  "didHappen": false
+}
+
+### Test: Try to confirm a session that hasn't been accepted yet
+PATCH {{baseUrl}}/sessions/{{sessionId}}/confirm
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "didHappen": true
+}

@@ -9,5 +9,7 @@ export class AuthResponseDto {
     firstName: string;
     lastName: string;
     role: Role;
+    isOnboarded: boolean;
+    avatarUrl?: string | null;
   };
 }

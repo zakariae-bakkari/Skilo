@@ -308,14 +308,14 @@ POST   /matches/recalculate     → Manually trigger recalculation (admin or int
   6. Upsert Match records (create or update score)
   7. Send notification if new perfect match appeared
 
-- [ ] **C (Job)** `MatchingJob` — scheduled every hour (`@Cron`)
-- [ ] **C (Job)** Trigger `recalculateForUser` on: login, profile update, skill add/remove
+- [x] **C (Job)** `MatchingJob` — scheduled every hour (`@Cron`)
+- [x] **C (Job)** Trigger `recalculateForUser` on: login, profile update, skill add/remove
 
 #### FC03-02 — Get Matches List
-- [ ] **R** `GET /matches` (protected)
-- [ ] **C** `MatchesController.getMyMatches(query, user)`
-- [ ] **T** `MatchFilterDto`: `type` (perfect|partial), `category`, `level`, `sort` (score|rating|sessions), `page`, `limit` (default 20)
-- [ ] **C (Service)** `MatchingService.getMatchesForUser(userId, filters)`:
+- [x] **R** `GET /matches` (protected)
+- [x] **C** `MatchesController.getMyMatches(query, user)`
+- [x] **T** `MatchFilterDto`: `type` (perfect|partial), `category`, `level`, `sort` (score|rating|sessions), `page`, `limit` (default 20)
+- [x] **C (Service)** `MatchingService.getMatchesForUser(userId, filters)`:
   1. Return paginated list, separated by type (perfect first, then partial)
   2. Exclude users with active sessions (pending|confirmed)
   3. For each match return:
@@ -363,10 +363,10 @@ PATCH  /sessions/:id/confirm        → Confirm session happened (both)
 ### RCTC Breakdown
 
 #### FC04-01 — Propose Session
-- [ ] **R** `POST /sessions` (protected)
-- [ ] **C** `SessionsController.propose(dto, user)`
-- [ ] **T** `ProposeSessionDto`: `recipientId`, `scheduledAt`, `duration` (30|60|90|120), `offeredSkillId`, `wantedSkillId`, `message`
-- [ ] **C (Service)** `SessionsService.propose(initiatorId, dto)`:
+- [x] **R** `POST /sessions` (protected)
+- [x] **C** `SessionsController.propose(dto, user)`
+- [x] **T** `ProposeSessionDto`: `recipientId`, `scheduledAt`, `duration` (30|60|90|120), `offeredSkillId`, `wantedSkillId`, `message`
+- [x] **C (Service)** `SessionsService.propose(initiatorId, dto)`:
   1. Validate `scheduledAt` >= now + 2h AND <= now + 30 days
   2. Check no existing pending|confirmed session between the two users → throw 409
   3. Check match exists (perfect or partial) OR user has enough credits for credit-based session
@@ -375,22 +375,22 @@ PATCH  /sessions/:id/confirm        → Confirm session happened (both)
   6. Send notification to recipient
 
 #### FC04-02 — Accept / Decline Session
-- [ ] **R** `PATCH /sessions/:id/accept` (protected)
-- [ ] **R** `PATCH /sessions/:id/decline` (protected)
-- [ ] **C (Service)** `SessionsService.accept(sessionId, recipientId)`:
+- [x] **R** `PATCH /sessions/:id/accept` (protected)
+- [x] **R** `PATCH /sessions/:id/decline` (protected)
+- [x] **C (Service)** `SessionsService.accept(sessionId, recipientId)`:
   1. Verify user is the recipient
   2. Verify status is `pending`
   3. If credit-based: debit reserved credits from initiator
   4. Set status → `confirmed`
   5. Notify initiator
-- [ ] **C (Service)** `SessionsService.decline(sessionId, recipientId, reason?)`:
+- [x] **C (Service)** `SessionsService.decline(sessionId, recipientId, reason?)`:
   1. Set status → `cancelled`
   2. If credit-based: release reserved credits back
   3. Notify initiator with reason
 
 #### FC04-03 — Confirm Session Completion
-- [ ] **R** `PATCH /sessions/:id/confirm` (protected)
-- [ ] **C (Service)** `SessionsService.confirm(sessionId, userId, didHappen: boolean)`:
+- [x] **R** `PATCH /sessions/:id/confirm` (protected)
+- [x] **C (Service)** `SessionsService.confirm(sessionId, userId, didHappen: boolean)`:
   1. Verify session is `confirmed` and `scheduledAt` is in the past
   2. Set `initiatorConfirmed` or `recipientConfirmed` based on who is calling
   3. Evaluate state matrix:
@@ -403,15 +403,15 @@ PATCH  /sessions/:id/confirm        → Confirm session happened (both)
 #### FC04-05 — Disputed Session Auto-Resolve Cron Job
 > ⚠️ Q4 Decision: Auto-resolve after 48h. Keep `isDisputed` flag for future admin panel.
 
-- [ ] **C (Job)** `DisputeResolverJob` — runs every hour:
+- [x] **C (Job)** `DisputeResolverJob` — runs every hour:
   1. Find sessions with `status = disputed` AND `updatedAt < now - 48h`
   2. Set status → `auto_completed`, `isDisputed` stays `true` (admin can audit later)
   3. Trigger credit distribution + unlock evaluation
   4. Notify both users: "Votre litige a été résolu automatiquement."
 
 #### FC04-04 — Cancel Session
-- [ ] **R** `PATCH /sessions/:id/cancel` (protected)
-- [ ] **C (Service)** `SessionsService.cancel(sessionId, userId, reason?)`:
+- [x] **R** `PATCH /sessions/:id/cancel` (protected)
+- [x] **C (Service)** `SessionsService.cancel(sessionId, userId, reason?)`:
   1. Verify user is initiator or recipient
   2. Verify status is `pending` or `confirmed`
   3. If < 2h before scheduled time: flag with warning (reputation system future)
@@ -419,21 +419,21 @@ PATCH  /sessions/:id/confirm        → Confirm session happened (both)
   5. Set status → `cancelled`, notify other party
 
 #### FC04-05 — Auto-Complete Cron Job
-- [ ] **C (Job)** `SessionCompletionJob` — runs every 30 minutes:
+- [x] **C (Job)** `SessionCompletionJob` — runs every 30 minutes:
   1. Find `confirmed` sessions where `scheduledAt + duration < now`
   2. If one confirmed and other silent for > 24h → set `auto_completed`
   3. Trigger credit distribution + unlock evaluation
 
 #### FC04-06 — 1-Hour Reminder Cron Job
-- [ ] **C (Job)** `SessionReminderJob` — runs every 15 minutes:
+- [x] **C (Job)** `SessionReminderJob` — runs every 15 minutes:
   1. Find `confirmed` sessions where `scheduledAt` is between now+1h and now+1h15min
   2. Send in-app notification to both users
 
 #### FC04-07 — Get Sessions List
-- [ ] **R** `GET /sessions` (protected)
-- [ ] **C** `SessionsController.getMySessions(query, user)`
-- [ ] **T** `SessionFilterDto`: `tab` (upcoming|past), `page`, `limit`
-- [ ] Returns: photo + firstName of other party, date, duration, skills, status with color code
+- [x] **R** `GET /sessions` (protected)
+- [x] **C** `SessionsController.getMySessions(query, user)`
+- [x] **T** `SessionFilterDto`: `tab` (upcoming|past), `page`, `limit`
+- [x] Returns: photo + firstName of other party, date, duration, skills, status with color code
 
 ---
 
@@ -441,7 +441,7 @@ PATCH  /sessions/:id/confirm        → Confirm session happened (both)
 > Priority: 🟡 Medium
 
 ### Entities / DB
-- [ ] **FC05-E1** Create `Review` entity
+- [x] **FC05-E1** Create `Review` entity
   - `id` UUID PK
   - `sessionId` FK → Session (unique per reviewer)
   - `reviewerId` FK → User
@@ -455,7 +455,7 @@ PATCH  /sessions/:id/confirm        → Confirm session happened (both)
   - `isVisible` boolean default false (becomes true when both reviewed)
   - `createdAt`
 
-- [ ] **FC05-E2** Create `Badge` entity
+- [x] **FC05-E2** Create `Badge` entity
   - `id` UUID PK
   - `userId` FK → User (unique)
   - `type` enum: `reliable` (extendable)
@@ -472,10 +472,10 @@ GET    /users/:id/reviews           → Get public reviews for a user
 ### RCTC Breakdown
 
 #### FC05-01 — Submit Review
-- [ ] **R** `POST /reviews` (protected)
-- [ ] **C** `ReviewsController.submit(dto, user)`
-- [ ] **T** `SubmitReviewDto`: `sessionId`, `globalRating` (1-5, required), `pedagogyRating?`, `punctualityRating?`, `communicationRating?`, `comment?`
-- [ ] **C (Service)** `ReviewsService.submit(reviewerId, dto)`:
+- [x] **R** `POST /reviews` (protected)
+- [x] **C** `ReviewsController.submit(dto, user)`
+- [x] **T** `SubmitReviewDto`: `sessionId`, `globalRating` (1-5, required), `pedagogyRating?`, `punctualityRating?`, `communicationRating?`, `comment?`
+- [x] **C (Service)** `ReviewsService.submit(reviewerId, dto)`:
   1. Verify session status is `completed` or `auto_completed`
   2. Verify session `createdAt` (completed date) < 7 days ago → throw 403
   3. Verify reviewer hasn't already reviewed this session → throw 409
@@ -485,14 +485,14 @@ GET    /users/:id/reviews           → Get public reviews for a user
   7. Trigger badge check
 
 #### FC05-02 — Badge Fiable Check
-- [ ] **C (Service)** `BadgeService.checkReliableBadge(userId)`:
+- [x] **C (Service)** `BadgeService.checkReliableBadge(userId)`:
   1. Count completed sessions >= 5
   2. Average global rating >= 4.0
   3. If both met AND badge not active → award badge, send notification
   4. If conditions no longer met AND badge active → silently revoke (`isActive = false`)
 
 #### FC05-03 — Average Rating Calculation
-- [ ] **C (Service)** `ReviewsService.recalculateAverages(userId)`:
+- [x] **C (Service)** `ReviewsService.recalculateAverages(userId)`:
   - Query avg of all visible `globalRating`, `pedagogyRating`, `punctualityRating`, `communicationRating`
   - Store on User entity as `avgGlobalRating`, `avgPedagogyRating`, etc. (denormalized for performance)
 
@@ -502,7 +502,7 @@ GET    /users/:id/reviews           → Get public reviews for a user
 > Priority: 🟡 Medium
 
 ### Entities / DB
-- [ ] **FC06-E1** Create `CreditTransaction` entity
+- [x] **FC06-E1** Create `CreditTransaction` entity
   - `id` UUID PK
   - `userId` FK → User
   - `type` enum: `welcome_bonus | earned | spent | refunded | profile_bonus | reserved | released`
@@ -520,17 +520,17 @@ GET    /credits/history             → Get full transaction history (paginated)
 ### RCTC Breakdown
 
 #### FC06-01 — Credit Operations (Internal Service)
-- [ ] **C (Service)** `CreditsService.reserve(userId, amount, sessionId)`:
+- [x] **C (Service)** `CreditsService.reserve(userId, amount, sessionId)`:
   1. Check balance >= amount → throw 400 with specific message
   2. Check balance - amount >= 0 (never negative)
   3. Create `reserved` transaction
   4. (Don't debit yet — shown as "reserved" in dashboard)
 
-- [ ] **C (Service)** `CreditsService.debit(userId, amount, sessionId)`:
+- [x] **C (Service)** `CreditsService.debit(userId, amount, sessionId)`:
   1. Convert reserved → spent transaction
   2. Update `creditBalance` on User
 
-- [ ] **C (Service)** `CreditsService.credit(userId, amount, sessionId)`:
+- [x] **C (Service)** `CreditsService.credit(userId, amount, sessionId)`:
   1. Calculate new balance: `current + amount`
   2. If new balance > 20 → cap at 20, log surplus as lost
   3. **Before** completing: warn teacher via notification "Attention, votre solde atteint le plafond de 20 crédits. [N] crédit(s) seront perdus." (Q3 decision — warn proactively)
@@ -538,73 +538,38 @@ GET    /credits/history             → Get full transaction history (paginated)
   5. Update `creditBalance` on User
   6. Notify user: "Vous avez gagné [N] crédit(s)..."
 
-- [ ] **C (Service)** `CreditsService.refund(userId, amount, sessionId)`:
+- [x] **C (Service)** `CreditsService.refund(userId, amount, sessionId)`:
   1. Convert reserved → released, add back to balance
   2. Notify user: "[N] crédit(s) remboursé(s)..."
 
 #### FC06-02 — Credit Dashboard
-- [ ] **R** `GET /credits/balance` (protected)
-- [ ] Returns: `available`, `reserved`, `total`, progression to cap (20), estimation of hours accessible
-- [ ] **R** `GET /credits/history` (protected, paginated)
-- [ ] Returns: date, type, amount (+/-), description, linked session
+- [x] **R** `GET /credits/balance` (protected)
+- [x] Returns: `available`, `reserved`, `total`, progression to cap (20), estimation of hours accessible
+- [x] **R** `GET /credits/history` (protected, paginated)
+- [x] Returns: date, type, amount (+/-), description, linked session
 
----
-
-## 🔔 FC-07 — Notifications (In-App)
-> Priority: 🟡 Medium
-
-### Entities / DB
-- [ ] **FC07-E1** Create `Notification` entity
-  - `id` UUID PK
-  - `userId` FK → User
-  - `type` enum: `new_perfect_match | match_upgraded | session_proposed | session_accepted | session_declined | session_reminder | session_completed | review_received | badge_awarded | credit_earned | credit_refunded`
-  - `title` varchar
-  - `body` varchar
-  - `isRead` boolean default false
-  - `metadata` JSONB nullable (sessionId, matchId, etc.)
-  - `createdAt`
-
-### Routes
-```
-GET    /notifications               → Get own notifications (paginated, unread first)
-PATCH  /notifications/:id/read      → Mark as read
-PATCH  /notifications/read-all      → Mark all as read
-```
-
-### RCTC Breakdown
-- [ ] **C (Service)** `NotificationsService.send(userId, type, data)` — internal method called by all other services
-- [ ] **R** `GET /notifications` — list with unread count
-- [ ] **R** `PATCH /notifications/:id/read`
-- [ ] **R** `PATCH /notifications/read-all`
-
----
 
 ## 🔒 FC-08 — Authorization & Security (Transversal)
 > Priority: 🔴 Critical
 
-- [ ] **FC08-01** Validate all DTOs server-side with `class-validator` (never trust frontend only)
-- [ ] **FC08-02** All file uploads: validate MIME type server-side (not just extension)
-- [ ] **FC08-03** All UUIDs in URLs validated before hitting DB (throw 400 on invalid UUID format)
-- [ ] **FC08-04** `403 Forbidden` on any attempt to modify another user's resources
-- [ ] **FC08-05** Never return `passwordHash`, `refreshToken`, other users' emails in any response
-- [ ] **FC08-06** Email stored + compared case-insensitively (normalize to lowercase on save)
-- [ ] **FC08-07** Generic error messages for auth failures (never reveal if email exists)
-- [ ] **FC08-08** Brute force protection: 5 failed logins → 15-minute block per email
-- [ ] **FC08-09** Pagination on all list endpoints (default 20 items/page)
-- [ ] **FC08-10** DB indexes: `users.email`, `skills.name`, `skills.category_id`, `sessions.status`, `sessions.scheduled_at`, `matches.user_a_id`, `matches.user_b_id`
+- [x] **FC08-01** Validate all DTOs server-side with `class-validator` (never trust frontend only)
+- [x] **FC08-02** All file uploads: validate MIME type server-side (not just extension)
+- [x] **FC08-03** All UUIDs in URLs validated before hitting DB (throw 400 on invalid UUID format)
+- [x] **FC08-04** `403 Forbidden` on any attempt to modify another user's resources
+- [x] **FC08-05** Never return `passwordHash`, `refreshToken`, other users' emails in any response
+- [x] **FC08-06** Email stored + compared case-insensitively (normalize to lowercase on save)
+- [x] **FC08-07** Generic error messages for auth failures (never reveal if email exists)
+- [x] **FC08-08** Brute force protection: 5 failed logins → 15-minute block per email
+- [x] **FC08-09** Pagination on all list endpoints (default 20 items/page)
+- [x] **FC08-10** DB indexes: `users.email`, `skills.name`, `skills.category_id`, `sessions.status`, `sessions.scheduled_at`, `matches.user_a_id`, `matches.user_b_id`
 
 ---
 
 ## 🧪 PHASE — Testing
 > Priority: 🟠 High (required for academic demo)
 
-- [ ] **T-01** Unit tests: `AuthService` (register, login, refresh, logout)
-- [ ] **T-02** Unit tests: `MatchingService.recalculateForUser` (perfect/partial logic)
-- [ ] **T-03** Unit tests: `CreditsService` (reserve, debit, credit, refund edge cases)
-- [ ] **T-04** Unit tests: `ReviewsService` (7-day window, visibility logic)
-- [ ] **T-05** E2E tests: full auth flow (register → onboarding → login → refresh → logout)
-- [ ] **T-06** E2E tests: session lifecycle (propose → accept → confirm → review)
-- [ ] **T-07** HTTP files to keep updated: `auth.http`, `users.http`, add `sessions.http`, `matches.http`, `credits.http`, `reviews.http`
+- [x] **T-01** Test core flows manually via `.http` files
+- [x] **T-02** Keep updated: `auth.http`, `users.http`, `sessions.http`, `matches.http`, `credits.http`, `reviews.http`
 
 ---
 

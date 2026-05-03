@@ -1,0 +1,172 @@
+# ══════════════════════════════════════════════════════════════════
+#  SKILO API — ACADEMIC DEMO FLOW
+#  Use this file to easily test the entire core flow for your presentation.
+# ══════════════════════════════════════════════════════════════════
+
+@baseUrl = http://localhost:2006
+
+# Variables that will be automatically set if you use REST Client extension
+@tokenA = {{loginA.response.body.access_token}}
+@tokenB = {{loginB.response.body.access_token}}
+@userA_Id = {{loginA.response.body.user.id}}
+@userB_Id = {{loginB.response.body.user.id}}
+@sessionId = {{proposeSession.response.body.id}}
+
+# We need some valid skill IDs from your database.
+# Replace these with actual IDs from your `skill_catalog` table before the demo.
+@skillReactId = PASTE_REACT_SKILL_ID_HERE
+@skillPythonId = PASTE_PYTHON_SKILL_ID_HERE
+
+# ─── 1. REGISTER & LOGIN ──────────────────────────────────────────
+
+### Register User A (Alice)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "alice.demo@example.com",
+  "password": "Password123!",
+  "firstName": "Alice",
+  "lastName": "Demoo"
+}
+
+### Login User A
+# @name loginA
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice.demo@example.com",
+  "password": "Password123!"
+}
+
+### Register User B (Bob)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "bob.demo@example.com",
+  "password": "Password123!",
+  "firstName": "Bob",
+  "lastName": "Demoo"
+}
+
+### Login User B
+# @name loginB
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "bob.demo@example.com",
+  "password": "Password123!"
+}
+
+
+# ─── 2. ONBOARDING (Add Skills) ───────────────────────────────────
+
+### Onboard User A (Offers React, Wants Python)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{tokenA}}
+
+{
+  "city": "Paris",
+  "bio": "Je suis une experte en React et je veux apprendre Python.",
+  "skillsOffered": [
+    { "skillCatalogId": "{{skillReactId}}", "level": "advanced" }
+  ],
+  "skillsWanted": [
+    { "skillCatalogId": "{{skillPythonId}}", "level": "beginner" }
+  ]
+}
+
+### Onboard User B (Offers Python, Wants React)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{tokenB}}
+
+{
+  "city": "Lyon",
+  "bio": "Expert Python cherchant à découvrir React.",
+  "skillsOffered": [
+    { "skillCatalogId": "{{skillPythonId}}", "level": "advanced" }
+  ],
+  "skillsWanted": [
+    { "skillCatalogId": "{{skillReactId}}", "level": "beginner" }
+  ]
+}
+
+
+# ─── 3. MATCHING ──────────────────────────────────────────────────
+
+### Get Matches for User A
+# @name getMatchesA
+GET {{baseUrl}}/matches?type=perfect
+Authorization: Bearer {{tokenA}}
+
+
+# ─── 4. SESSIONS ──────────────────────────────────────────────────
+
+### Propose a Session (User A proposes to User B)
+# Note: Ensure scheduledAt is at least 2 hours in the future
+# @name proposeSession
+POST {{baseUrl}}/sessions
+Content-Type: application/json
+Authorization: Bearer {{tokenA}}
+
+{
+  "recipientId": "{{userB_Id}}",
+  "scheduledAt": "2026-12-01T14:00:00.000Z",
+  "duration": 60,
+  "offeredSkillId": "{{skillReactId}}",
+  "wantedSkillId": "{{skillPythonId}}",
+  "message": "Salut Bob, on fait cet échange React/Python ?",
+  "meetingLink": "https://meet.google.com/abc-defg-hij"
+}
+
+### Accept Session (User B accepts)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/accept
+Authorization: Bearer {{tokenB}}
+
+### Get User A's Upcoming Sessions
+GET {{baseUrl}}/sessions?tab=upcoming
+Authorization: Bearer {{tokenA}}
+
+
+# ─── 5. CONFIRMATION & REVIEWS ────────────────────────────────────
+
+### Confirm Session (User A says it happened)
+# Note: In a real scenario, this is only allowed AFTER the scheduledAt time has passed.
+PATCH {{baseUrl}}/sessions/{{sessionId}}/confirm
+Content-Type: application/json
+Authorization: Bearer {{tokenA}}
+
+{
+  "didHappen": true
+}
+
+### Confirm Session (User B says it happened -> Status becomes completed)
+PATCH {{baseUrl}}/sessions/{{sessionId}}/confirm
+Content-Type: application/json
+Authorization: Bearer {{tokenB}}
+
+{
+  "didHappen": true
+}
+
+### Submit Review (User A reviews User B)
+POST {{baseUrl}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{tokenA}}
+
+{
+  "sessionId": "{{sessionId}}",
+  "globalRating": 5,
+  "pedagogyRating": 5,
+  "communicationRating": 5,
+  "comment": "Bob explique très bien Python !"
+}
+
+### Check Credits for User B (Should have earned a credit if it was a partial match, but this is a perfect match so no credits are exchanged)
+GET {{baseUrl}}/credits/balance
+Authorization: Bearer {{tokenB}}

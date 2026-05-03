@@ -1,0 +1,144 @@
+@baseUrl = http://localhost:2006
+@token = PASTE_YOUR_ACCESS_TOKEN_HERE
+
+@skill1 = 0031d8aa-d265-47f8-a7f1-f026456ca582
+@skill2 = 0031d8aa-d265-47f8-a7f1-f026456ca582
+
+
+### ─── 1. Check Onboarding Status ───
+
+### Check what information is already filled out
+GET {{baseUrl}}/onboarding/status
+Authorization: Bearer {{token}}
+
+
+### ─── 2. Complete Onboarding ───
+
+### Complete all onboarding steps at once (Skills, City, Bio, Avatar)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [
+    { "skillId": "0031d8aa-d265-47f8-a7f1-f026456ca582", "level": "intermediate" },
+    { "skillId": "0031d8aa-d265-47f8-a7f1-f026456ca582", "level": "advanced" }
+  ],
+  "skillsWanted": [
+    { "skillId": "0031d8aa-d265-47f8-a7f1-f026456ca582", "level": "beginner" }
+  ],
+  "city": "Casablanca",
+  "bio": "Je suis passionné par le code et j'adore apprendre de nouvelles choses.",
+  "avatarUrl": "https://res.cloudinary.com/skilo/image/upload/v1/avatars/sample.jpg"
+}
+
+### Complete onboarding with only the required fields (No bio or avatar)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [
+    { "skillId": "{{skill1}}", "level": "beginner" }
+  ],
+  "skillsWanted": [
+    { "skillId": "{{skill2}}", "level": "intermediate" }
+  ],
+  "city": "Rabat"
+}
+
+
+### ─── 3. Test Error Cases ───
+
+### Test: Try to onboard without a token
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+
+{
+  "skillsOffered": [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill2}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### Test: Try to onboard without offering any skills
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [],
+  "skillsWanted": [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### Test: Try to onboard with too many skills (maximum is 5)
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" },
+    { "skillId": "{{skill1}}", "level": "beginner" }
+  ],
+  "skillsWanted": [{ "skillId": "{{skill2}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### Test: Try to use a skill ID that isn't a valid UUID
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "not-a-uuid", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### Test: Try to use a skill ID that doesn't exist in the database
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "00000000-0000-0000-0000-000000000000", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### Test: Try to submit an invalid skill level
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "{{skill1}}", "level": "expert" }],
+  "skillsWanted":  [{ "skillId": "{{skill2}}", "level": "beginner" }],
+  "city": "Casablanca"
+}
+
+### Test: Try to onboard without specifying a city
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill2}}", "level": "beginner" }]
+}
+
+### Test: Try to onboard when you have already completed onboarding
+POST {{baseUrl}}/onboarding
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "skillsOffered": [{ "skillId": "{{skill1}}", "level": "beginner" }],
+  "skillsWanted":  [{ "skillId": "{{skill2}}", "level": "beginner" }],
+  "city": "Casablanca"
+}

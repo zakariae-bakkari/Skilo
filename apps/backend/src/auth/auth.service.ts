@@ -15,6 +15,7 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtPayload } from './types/jwt-payload.type';
 import { User } from 'generated/prisma/client';
 import { Role } from './enums/role.enum';
+import { MatchingService } from 'src/matching/matching.service';
 
 const BCRYPT_COST = 12; // spec FC-01-A
 const MAX_ATTEMPTS = 5;
@@ -26,6 +27,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly matchingService: MatchingService,
   ) {}
 
   // ─── Register ─────────────────────────────────────────────────────────────
@@ -99,7 +101,11 @@ export class AuthService {
       },
     });
 
-    return this.buildResponse(user);
+    if (user.isOnboarded) {
+      this.matchingService.recalculateForUser(user.id).catch(() => {});
+    }
+
+    return await this.buildResponse(user);
   }
 
   // ─── Refresh ──────────────────────────────────────────────────────────────
@@ -226,6 +232,7 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role as Role,
+      avatarUrl: user.avatarUrl,
     };
 
     const access_token = await this.jwtService.signAsync(payload, {
@@ -247,6 +254,8 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role as Role,
+        isOnboarded: user.isOnboarded,
+        avatarUrl: user.avatarUrl,
       },
     };
   }

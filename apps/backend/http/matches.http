@@ -1,0 +1,76 @@
+@baseUrl = http://localhost:2006
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzOWU4YjUzNy1lZDhkLTQyOGItYTg4Yy1iZDM5Y2VlOWMwYzgiLCJlbWFpbCI6Im1lcmllbTIwMDRAZXhhbXBsZS5jb20iLCJmaXJzdE5hbWUiOiJtZXJpZW0iLCJsYXN0TmFtZSI6ImhhbXJpIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3Nzc3NDY0MDgsImV4cCI6MTc3Nzc0NzMwOH0.8ZRJEyupzLV2TFqihxa3NoBx1Ce6ejZo8UcRgbKN3HI
+@adminToken = PASTE_ADMIN_ACCESS_TOKEN_HERE
+@matchId = PASTE_MATCH_UUID_HERE
+
+### ─── 1. View Your Matches ───
+
+### View all your matches (perfect matches show up first)
+GET {{baseUrl}}/matches
+Authorization: Bearer {{token}}
+
+### View only your perfect matches (direct skill exchange)
+GET {{baseUrl}}/matches?type=perfect
+Authorization: Bearer {{token}}
+
+### View only your partial matches (requires credits)
+GET {{baseUrl}}/matches?type=partial
+Authorization: Bearer {{token}}
+
+### Filter matches to only show tech skills
+GET {{baseUrl}}/matches?category=tech
+Authorization: Bearer {{token}}
+
+### Filter matches to only show beginners
+GET {{baseUrl}}/matches?level=beginner
+Authorization: Bearer {{token}}
+
+### Sort matches by the other user's rating (highest first)
+GET {{baseUrl}}/matches?sort=rating
+Authorization: Bearer {{token}}
+
+### Sort matches by the number of sessions the other user has completed
+GET {{baseUrl}}/matches?sort=sessions
+Authorization: Bearer {{token}}
+
+### View matches using pagination (Page 1, 5 items)
+GET {{baseUrl}}/matches?page=1&limit=5
+Authorization: Bearer {{token}}
+
+### Combine multiple filters (perfect tech matches, sorted by rating)
+GET {{baseUrl}}/matches?type=perfect&category=tech&sort=rating&page=1&limit=10
+Authorization: Bearer {{token}}
+
+### Test: Try to use a wrong match type filter
+GET {{baseUrl}}/matches?type=superMatch
+Authorization: Bearer {{token}}
+
+### Test: Try to use a wrong sort parameter
+GET {{baseUrl}}/matches?sort=alphabetical
+Authorization: Bearer {{token}}
+
+
+### ─── 2. View a Specific Match ───
+
+### View details of a specific match
+GET {{baseUrl}}/matches/{{matchId}}
+Authorization: Bearer {{token}}
+
+### Test: Try to view a match that doesn't exist
+GET {{baseUrl}}/matches/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+### Test: Try to view a match that belongs to someone else
+GET {{baseUrl}}/matches/e492ee4c-99a6-462a-9d43-241d431cb669
+Authorization: Bearer {{token}}
+
+
+### ─── 3. Admin Tools ───
+
+### Force the system to recalculate all matches immediately
+POST {{baseUrl}}/matches/recalculate
+Authorization: Bearer {{adminToken}}
+
+### Test: Try to recalculate matches using a normal user account
+POST {{baseUrl}}/matches/recalculate
+Authorization: Bearer {{token}}
