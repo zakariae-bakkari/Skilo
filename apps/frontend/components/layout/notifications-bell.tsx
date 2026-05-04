@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Bell, 
   Award, 
@@ -50,6 +51,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export function NotificationsBell() {
+  const router                      = useRouter();
   const [open, setOpen]             = useState(false);
   const [items, setItems]           = useState<Notification[]>([]);
   const [unread, setUnread]         = useState(0);
@@ -74,6 +76,31 @@ export function NotificationsBell() {
     await notificationsApi.markAllRead().catch(() => {});
     setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setUnread(0);
+  }
+
+  async function handleNotificationClick(n: Notification) {
+    if (!n.isRead) {
+      await notificationsApi.markRead(n.id).catch(() => {});
+      setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, isRead: true } : item));
+      setUnread((u) => Math.max(0, u - 1));
+    }
+
+    const payload = n.payload as Record<string, any>;
+    
+    // Determine where to redirect
+    if (n.type.includes('match') && payload.matchId) {
+      router.push(`/matches?id=${payload.matchId}`);
+    } else if (n.type.includes('session') && payload.sessionId) {
+      router.push(`/sessions?id=${payload.sessionId}`);
+    } else if (n.type === 'credits_earned' || n.type === 'credits_spent' || n.type === 'credits_refunded') {
+      router.push('/credits');
+    } else if (n.type === 'review_received') {
+      router.push('/profile?tab=reviews');
+    } else if (n.type === 'badge_earned') {
+      router.push('/profile');
+    }
+
+    setOpen(false);
   }
 
   return (
@@ -107,9 +134,10 @@ export function NotificationsBell() {
               <p className="text-sm text-muted-foreground text-center py-8">Aucune notification</p>
             ) : (
               items.map((n) => (
-                <div
+                <button
                   key={n.id}
-                  className={`px-4 py-3 text-sm ${n.isRead ? '' : 'bg-primary/5'}`}
+                  onClick={() => handleNotificationClick(n)}
+                  className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-muted/50 ${n.isRead ? '' : 'bg-primary/5'}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 p-1.5 bg-background rounded-full border border-border">
@@ -124,7 +152,7 @@ export function NotificationsBell() {
                       </p>
                     </div>
                   </div>
-                </div>
+                </button>
               ))
             )}
           </div>

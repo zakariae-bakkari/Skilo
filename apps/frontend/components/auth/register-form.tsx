@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Eye, EyeOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,8 @@ export function RegisterForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +36,6 @@ export function RegisterForm() {
   const searchParams = useSearchParams();
   const ref = searchParams.get('ref');
 
-  // Client-side validation before hitting the API
   function validate(): string | null {
     if (firstName.trim().length < 2) return 'Le prénom doit contenir au moins 2 caractères.';
     if (lastName.trim().length < 2) return 'Le nom doit contenir au moins 2 caractères.';
@@ -64,7 +66,6 @@ export function RegisterForm() {
         referredById: ref || undefined
       });
       login(data.access_token, data.user);
-      //New users go to onboarding, not dashboard
       router.push('/onboarding');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error. Please try again.');
@@ -130,28 +131,56 @@ export function RegisterForm() {
 
           <div className="space-y-2">
             <Label htmlFor="register-password">Mot de passe</Label>
-            <Input
-              id="register-password"
-              type="password"
-              autoComplete="new-password"
-              placeholder="Min. 8 car., 1 majuscule, 1 chiffre"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="register-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                placeholder="Min. 8 car., 1 majuscule, 1 chiffre"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="pr-10"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="register-confirm">Confirmer le mot de passe</Label>
-            <Input
-              id="register-confirm"
-              type="password"
-              autoComplete="new-password"
-              placeholder="Répétez votre mot de passe"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="register-confirm"
+                type={showConfirmPassword ? "text" : "password"}
+                autoComplete="new-password"
+                placeholder="Répétez votre mot de passe"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="pr-10"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
         </CardContent>
 

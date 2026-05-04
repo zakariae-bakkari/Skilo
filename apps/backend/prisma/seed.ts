@@ -4,7 +4,7 @@
 //          sessions, reviews, credit_transactions, notifications
 // ============================================================
 
-import { PrismaClient } from 'generated/prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
 

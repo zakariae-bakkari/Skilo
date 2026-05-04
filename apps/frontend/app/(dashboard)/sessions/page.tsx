@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ReviewDialog } from '@/components/sessions/review-dialog';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ function Avatar({ user, size = 10 }: { user: { firstName: string; lastName: stri
 // ─── Session card ─────────────────────────────────────────────────────────────
 
 function SessionCard({
-  session, currentUserId, onAccept, onDecline, onCancel, onConfirm, onOpenReview,
+  session, currentUserId, onAccept, onDecline, onCancel, onConfirm, onOpenReview, highlight
 }: {
   session: Session;
   currentUserId: string;
@@ -59,6 +60,7 @@ function SessionCard({
   onCancel: (id: string) => void;
   onConfirm: (id: string, happened: boolean) => void;
   onOpenReview: (session: Session) => void;
+  highlight?: boolean;
 }) {
   const isInitiator = session.proposedBy?.id === currentUserId;
   const other = isInitiator ? session.recipient : session.proposedBy;
@@ -68,17 +70,19 @@ function SessionCard({
 
   const now = new Date();
   const scheduledAt = new Date(session.scheduledAt);
-  const isPast = scheduledAt < now;
-  const isConfirmable = (session.status === 'confirmed') && isPast;
+  const isConfirmable = session.status === 'confirmed';
   const canIConfirm = isConfirmable && (isInitiator ? !session.confirmedByA : !session.confirmedByB);
   
   const hasReviewed = session.reviews?.some(r => r.reviewerId === currentUserId);
   const canReview = session.status === 'completed' && !hasReviewed;
 
   return (
-    <div className="group relative bg-card/40 backdrop-blur-md border border-border/50 rounded-[2rem] p-6 transition-all hover:bg-card/60 hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1 overflow-hidden">
+    <div 
+      id={`session-${session.id}`}
+      className={`group relative bg-card/40 backdrop-blur-md border rounded-[2rem] p-6 transition-all hover:bg-card/60 hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1 overflow-hidden ${highlight ? 'border-primary ring-2 ring-primary/20 bg-primary/5 shadow-lg shadow-primary/10' : 'border-border/50'}`}
+    >
       {/* Decorative gradient blob */}
-      <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/5 blur-[100px] rounded-full group-hover:bg-primary/10 transition-colors" />
+      <div className={`absolute -top-24 -right-24 w-48 h-48 blur-[100px] rounded-full group-hover:bg-primary/10 transition-colors ${highlight ? 'bg-primary/20' : 'bg-primary/5'}`} />
 
       {/* Top Bar: Status & Credits */}
       <div className="flex items-center justify-between mb-8 relative z-10">
@@ -96,7 +100,7 @@ function SessionCard({
           )}
           {['pending', 'confirmed'].includes(session.status) && (
             <Link
-              href={`/messages/${session.id}`}
+              href={`/sessions/${session.id}/chat`}
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all shadow-sm active:scale-95"
             >
               <MessageCircle className="w-3.5 h-3.5" />
@@ -108,20 +112,22 @@ function SessionCard({
 
       {/* Main Info Grid */}
       <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 items-start relative z-10">
-        <div className="relative mx-auto md:mx-0">
+        <Link href={`/users/${other.id}`} className="relative mx-auto md:mx-0 group/avatar">
           <Avatar user={other} size={16} />
           {!isInitiator && session.status === 'pending' && (
             <div className="absolute -top-1 -right-1 w-6 h-6 bg-primary rounded-xl border-4 border-background flex items-center justify-center shadow-lg">
               <Sparkles className="w-3 h-3 text-white" />
             </div>
           )}
-        </div>
+        </Link>
 
         <div className="space-y-5 text-center md:text-left">
           <div>
-            <h3 className="text-2xl font-black text-foreground tracking-tight">
-              {other.firstName} {other.lastName}
-            </h3>
+            <Link href={`/users/${other.id}`}>
+              <h3 className="text-2xl font-black text-foreground tracking-tight hover:text-primary transition-colors">
+                {other.firstName} {other.lastName}
+              </h3>
+            </Link>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-xs text-muted-foreground mt-2">
               <span className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-xl border border-border/50">
                 <Calendar className="w-3.5 h-3.5 text-primary/70" /> 
@@ -265,7 +271,10 @@ function SessionCard({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SessionsPage() {
+  const router = useRouter();
   const { user: authUser } = useAuth();
+  const searchParams = useSearchParams();
+  const targetId = searchParams.get('id');
 
   const [tab,      setTab]      = useState<'upcoming' | 'past'>('upcoming');
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -282,10 +291,18 @@ export default function SessionsPage() {
   const fetchSessions = useCallback(() => {
     setLoading(true);
     sessionsApi.list({ tab, page, limit: LIMIT })
-      .then((res) => { setSessions(res.data); setTotal(res.total); })
+      .then((res) => { 
+        setSessions(res.data); 
+        setTotal(res.total);
+        
+        // Redirect to detail page if ID is provided
+        if (targetId) {
+          router.push(`/sessions/${targetId}`);
+        }
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [tab, page]);
+  }, [tab, page, targetId]);
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
   useEffect(() => { setPage(1); }, [tab]);
@@ -432,6 +449,7 @@ export default function SessionsPage() {
                 onCancel={handleCancel}
                 onConfirm={handleConfirm}
                 onOpenReview={setReviewSession}
+                highlight={s.id === targetId}
               />
             ))}
           </div>

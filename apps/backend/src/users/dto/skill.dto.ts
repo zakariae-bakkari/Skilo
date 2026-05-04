@@ -1,5 +1,5 @@
 import { IsEnum, IsUUID } from 'class-validator';
-import { SkillLevel, SkillType } from 'generated/prisma/client';
+import { SkillLevel, SkillType } from '@prisma/client';
 
 export class AddSkillDto {
   @IsUUID('4', { message: 'skillId must be a valid UUID' })

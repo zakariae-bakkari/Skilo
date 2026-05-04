@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AddSkillDto, UpdateSkillLevelDto } from './dto/skill.dto'; // ← was missing
-import { SkillType } from 'generated/prisma/client';
+import { SkillType } from '@prisma/client';
 import { MatchingService } from '../matching/matching.service';
 // SkillsService removed — UsersService handles skill ops directly via Prisma
 
@@ -187,10 +187,20 @@ export class UsersService {
       },
     });
 
+    // Fetch match details for "compatibility" indicator
+    const [id1, id2] = [currentUserId, targetId].sort();
+    const match = await this.prisma.match.findUnique({
+      where: {
+        userAId_userBId: { userAId: id1, userBId: id2 },
+      },
+      select: { score: true, label: true, type: true, matchedPairs: true },
+    });
+
     return {
       ...target,
       email: hasConfirmedSession ? target['email'] : undefined,
       actionButton,
+      match: match || null,
     };
   }
 

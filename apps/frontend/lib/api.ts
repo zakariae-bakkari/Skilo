@@ -101,13 +101,19 @@ export interface Session {
     id:        string;
     firstName: string;
     lastName:  string;
+    city?:      string;
     avatarUrl?: string;
+    avgRating?: number;
+    sessionsCompleted?: number;
   };
   recipient: {
     id:        string;
     firstName: string;
     lastName:  string;
+    city?:      string;
     avatarUrl?: string;
+    avgRating?: number;
+    sessionsCompleted?: number;
   };
   reviews?: { reviewerId: string }[];
 }
@@ -400,6 +406,9 @@ export const matchesApi = {
   get: (matchId: string) =>
     get<Match>(`/matches/${matchId}`),
 
+  byUser: (userId: string) =>
+    get<Match>(`/matches/user/${userId}`),
+
   recalculate: () =>
     post<void>('/matches/recalculate'),
 };
@@ -475,7 +484,7 @@ export const reviewsApi = {
   }) => post<Review>('/reviews', data),
 
   forUser: (userId: string) =>
-    get<Review[]>(`/reviews/user/${userId}`),
+    get<PaginatedResponse<Review>>(`/users/${userId}/reviews`),
 };
 
 // ─── Notifications API ────────────────────────────────────────────────────────

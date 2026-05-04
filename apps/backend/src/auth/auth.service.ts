@@ -14,7 +14,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtPayload } from './types/jwt-payload.type';
-import { User } from 'generated/prisma/client';
+import { User } from '@prisma/client';
 import { Role } from './enums/role.enum';
 import { MatchingService } from '../matching/matching.service';
 import { CreditsService } from '../credits/credits.service';

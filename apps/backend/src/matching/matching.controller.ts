@@ -52,6 +52,15 @@ export class MatchingController {
     }
   }
 
+  // GET /matches/user/:userId — find match by target user ID
+  @Get('user/:userId')
+  async getMatchByUser(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.matchingService.getMatchBetweenUsers(req.user.sub, userId);
+  }
+
   // POST /matches/recalculate — admin trigger for manual recalculation
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)

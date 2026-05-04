@@ -167,8 +167,8 @@ export class ReviewsService {
         ratingCommunication: true,
         comment: true,
         submittedAt: true,
-        reviewer: { select: { id: true, firstName: true, avatarUrl: true } },
-        reviewee: { select: { id: true, firstName: true } },
+        reviewer: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        reviewee: { select: { id: true, firstName: true, lastName: true } },
       },
     });
   }
@@ -194,7 +194,7 @@ export class ReviewsService {
           comment: true,
           submittedAt: true,
           skillCatalog: { select: { name: true } },
-          reviewer: { select: { firstName: true, avatarUrl: true } },
+          reviewer: { select: { firstName: true, lastName: true, avatarUrl: true } },
         },
       }),
       this.prisma.review.count({
