@@ -35,6 +35,20 @@ function CoinsIcon(props: any) {
     return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  new_perfect_match:  "Nouveau match parfait !",
+  match_upgraded:     "Match amélioré",
+  session_proposed:   "Session proposée",
+  session_accepted:   "Session acceptée",
+  session_declined:   "Session déclinée",
+  session_reminder:   "Rappel de session",
+  session_completed:  "Session terminée",
+  review_received:    "Nouvel avis reçu",
+  badge_earned:       "Nouveau badge obtenu",
+  credits_earned:     "Crédits gagnés",
+  credits_refunded:   "Crédits remboursés",
+};
+
 export function NotificationsBell() {
   const [open, setOpen]             = useState(false);
   const [items, setItems]           = useState<Notification[]>([]);
@@ -103,7 +117,7 @@ export function NotificationsBell() {
                     </div>
                     <div className="min-w-0">
                       <p className={`leading-snug ${n.isRead ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
-                        {String((n.payload as Record<string, unknown>)?.body ?? n.type)}
+                        {String((n.payload as Record<string, unknown>)?.body ?? TYPE_LABELS[n.type] ?? n.type)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {new Date(n.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}

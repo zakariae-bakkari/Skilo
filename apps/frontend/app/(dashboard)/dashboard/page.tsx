@@ -56,7 +56,7 @@ export default function DashboardPage() {
         </div>
         <div className="relative z-10">
           <h1 className="text-3xl font-bold tracking-tight mb-2">Bonjour, {user?.firstName}! 👋</h1>
-          <p className="text-muted-foreground">Welcome back to your skill-sharing hub. Here's what's happening today.</p>
+          <p className="text-muted-foreground">Ravi de vous revoir sur votre plateforme d'échange de compétences. Voici ce qui se passe aujourd'hui.</p>
         </div>
         <div className="flex gap-3 relative z-10">
           <Button 
@@ -80,7 +80,7 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-2 relative z-10">
               <div className="flex justify-between items-end mb-1">
-                <span className="text-sm font-bold">Growth</span>
+                <span className="text-sm font-bold">Croissance</span>
                 <span className="text-xs font-bold text-primary">{user?.profileScore}%</span>
               </div>
               <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
@@ -90,7 +90,7 @@ export default function DashboardPage() {
                 />
               </div>
               <p className="text-[10px] text-muted-foreground leading-relaxed pt-2">
-                Complete 2 more sessions to reach <span className="font-bold text-foreground">Level 2</span> and unlock new perks!
+                Complétez 2 sessions de plus pour atteindre le <span className="font-bold text-foreground">Niveau 2</span> et débloquer de nouveaux avantages !
               </p>
             </div>
           </div>
@@ -101,10 +101,10 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between px-2">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <UsersIcon className="w-5 h-5 text-primary" /> 
-              Matches for you
+              Matches pour vous
             </h2>
             <Badge variant="outline" className="text-[10px] uppercase tracking-wider font-bold opacity-70">
-              {matches.length} Recommended
+              {matches.length} Recommandés
             </Badge>
           </div>
           
@@ -115,7 +115,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-3 space-y-6">
           <div className="flex items-center gap-2 px-2">
             <Calendar className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-bold">Your Sessions</h2>
+            <h2 className="text-lg font-bold">Vos Sessions</h2>
           </div>
           
           <SessionList sessions={sessions} />
@@ -125,13 +125,13 @@ export default function DashboardPage() {
               <Share2 className="w-7 h-7 text-primary" />
             </div>
             <div className="space-y-2">
-              <h3 className="font-bold text-sm">Invite a friend</h3>
+              <h3 className="font-bold text-sm">Inviter un ami</h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Earn <span className="text-primary font-bold">5 credits</span> for every friend who completes their first session!
+                Gagnez <span className="text-primary font-bold">5 crédits</span> pour chaque ami qui termine sa première session !
               </p>
             </div>
             <Button variant="secondary" size="sm" className="w-full text-xs rounded-xl h-9">
-              Copy Invite Link
+              Copier le lien d'invitation
             </Button>
           </div>
         </div>

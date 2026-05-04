@@ -25,13 +25,13 @@ export function MatchList({ matches }: { matches: Match[] }) {
         <div className="w-12 h-12 rounded-full border border-dashed flex items-center justify-center mb-4">
           <Search className="w-6 h-6 text-muted-foreground" />
         </div>
-        <CardTitle className="text-xl">No matches yet</CardTitle>
+        <CardTitle className="text-xl">Pas encore de matches</CardTitle>
         <CardDescription className="mt-2 max-w-xs">
-          We're looking for mentors or learners that match your skill profile. 
-          Try adding more skills to your profile!
+          Nous recherchons des mentors ou des apprenants qui correspondent à votre profil. 
+          Essayez d'ajouter plus de compétences à votre profil !
         </CardDescription>
         <Button variant="outline" size="sm" className="mt-6">
-          Update your skills
+          Mettre à jour vos compétences
         </Button>
       </Card>
     );
@@ -54,22 +54,22 @@ export function MatchList({ matches }: { matches: Match[] }) {
                   </div>
                   <div>
                     <p className="font-bold text-sm">{match.otherUser.firstName} {match.otherUser.lastName}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{match.otherUser.city ? `From ${match.otherUser.city}` : 'Skill sharer'}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-1">{match.otherUser.city ? `De ${match.otherUser.city}` : 'Partageur de compétences'}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100">
-                    {Math.round(match.score)}% Match
+                    {Math.round(match.score)}% de match
                   </Badge>
                 </div>
               </div>
 
               <div className="mt-4 flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-1.5 line-clamp-1">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">Skills swap:</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">Échange de compétences :</span>
                   {match.matchedPairs && match.matchedPairs.length > 0 && match.matchedPairs[0].offeredByB && match.matchedPairs[0].offeredByA && (
                     <Badge variant="outline" className="text-[10px] h-5 py-0 truncate max-w-[200px]">
-                      {match.matchedPairs[0].offeredByB.name} for {match.matchedPairs[0].offeredByA.name}
+                      {match.matchedPairs[0].offeredByB.name} contre {match.matchedPairs[0].offeredByA.name}
                     </Badge>
                   )}
                 </div>
@@ -85,7 +85,7 @@ export function MatchList({ matches }: { matches: Match[] }) {
                     handlePropose(match);
                   }}
                 >
-                  Propose session <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
+                  Proposer une session <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
                 </Button>
               </div>
             </CardContent>

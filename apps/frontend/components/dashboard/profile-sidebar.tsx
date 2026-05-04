@@ -28,7 +28,7 @@ export function ProfileSidebar({ user }: { user: User | null }) {
 
         <div className="flex flex-wrap justify-center gap-2 mb-6">
           <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200">
-            <CreditCard className="w-3 h-3" /> {user.creditBalance} Credits
+            <CreditCard className="w-3 h-3" /> {user.creditBalance} Crédits
           </Badge>
         </div>
 

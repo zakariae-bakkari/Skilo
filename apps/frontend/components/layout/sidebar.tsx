@@ -5,11 +5,11 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, ArrowRightLeft, Calendar, User, MessageCircle } from 'lucide-react';
 
 const NAV = [
-  { href: '/dashboard', label: 'Overview',   icon: <LayoutDashboard className="w-5 h-5" /> },
+  { href: '/dashboard', label: 'Vue d\'ensemble', icon: <LayoutDashboard className="w-5 h-5" /> },
   { href: '/matches',   label: 'Matches',    icon: <ArrowRightLeft className="w-5 h-5" /> },
   { href: '/sessions',  label: 'Sessions',   icon: <Calendar className="w-5 h-5" /> },
   { href: '/messages',  label: 'Messages',   icon: <MessageCircle className="w-5 h-5" /> },
-  { href: '/profile',   label: 'My Profile', icon: <User className="w-5 h-5" /> },
+  { href: '/profile',   label: 'Mon Profil', icon: <User className="w-5 h-5" /> },
 ];
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -64,7 +64,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {/* Footer hint */}
         <div className="p-4 border-t border-border">
           <p className="text-xs text-muted-foreground">
-            1 hour taught = 1 credit ⏱
+            1 heure enseignée = 1 crédit ⏱
           </p>
         </div>
       </aside>
