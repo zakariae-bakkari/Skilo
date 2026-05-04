@@ -1,6 +1,6 @@
 import { IsEnum, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MatchType, SkillCategory, SkillLevel } from 'generated/prisma/client';
+import { MatchType, SkillCategory, SkillLevel } from '@prisma/client';
 
 export class MatchFilterDto {
   @IsOptional()

@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Match } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,12 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Sparkles, ArrowRight } from 'lucide-react';
 import { ProposeSessionModal } from '@/components/matches/propose-modal';
 
-import { useState } from 'react';
-
-
 export function MatchList({ matches }: { matches: Match[] }) {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const router = useRouter();
 
   const handlePropose = (match: Match) => {
     setSelectedMatch(match);
@@ -41,19 +42,34 @@ export function MatchList({ matches }: { matches: Match[] }) {
     <>
       <div className="grid grid-cols-1 gap-4">
         {matches.map((match) => (
-          <Card key={match.id} className="hover:border-primary/50 transition-colors group cursor-pointer overflow-hidden">
+          <Card 
+            key={match.id} 
+            className="hover:border-primary/50 transition-colors group cursor-pointer overflow-hidden"
+            onClick={() => router.push(`/matches/${match.id}`)}
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold overflow-hidden shadow-sm">
-                    {match.otherUser.avatarUrl ? (
-                      <img src={match.otherUser.avatarUrl} alt="Match" className="w-full h-full object-cover" />
-                    ) : (
-                      <span>{match.otherUser.firstName[0]}</span>
-                    )}
-                  </div>
+                  <Link 
+                    href={`/users/${match.otherUser.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold overflow-hidden shadow-sm hover:ring-2 hover:ring-primary transition-all">
+                      {match.otherUser.avatarUrl ? (
+                        <img src={match.otherUser.avatarUrl} alt="Match" className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{match.otherUser.firstName[0]}</span>
+                      )}
+                    </div>
+                  </Link>
                   <div>
-                    <p className="font-bold text-sm">{match.otherUser.firstName} {match.otherUser.lastName}</p>
+                    <Link 
+                      href={`/users/${match.otherUser.id}`}
+                      className="hover:text-primary transition-colors block"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <p className="font-bold text-sm">{match.otherUser.firstName} {match.otherUser.lastName}</p>
+                    </Link>
                     <p className="text-xs text-muted-foreground line-clamp-1">{match.otherUser.city ? `De ${match.otherUser.city}` : 'Partageur de compétences'}</p>
                   </div>
                 </div>
@@ -104,4 +120,3 @@ export function MatchList({ matches }: { matches: Match[] }) {
     </>
   );
 }
-

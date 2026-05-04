@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { matchesApi } from '@/lib/api';
 import type { Match, SkillCategory, SkillLevel, MatchType } from '@/lib/api';
 import { Search, Sparkles, MapPin, Star, Monitor, Globe, Palette, Briefcase, Trophy, ChefHat, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 import { ProposeSessionModal } from '@/components/matches/propose-modal';
 
@@ -28,7 +29,8 @@ const SORT_OPTIONS = [
 
 // ─── Match card ───────────────────────────────────────────────────────────────
 
-function MatchCard({ match, onPropose }: { match: Match; onPropose: (m: Match) => void }) {
+function MatchCard({ match, onPropose, highlight }: { match: Match; onPropose: (m: Match) => void; highlight?: boolean }) {
+  const router = useRouter();
   const u = match.otherUser;
   const initials = [u?.firstName?.[0] || '?', u?.lastName?.[0] || ''].join('').toUpperCase();
   const isPerfect = match.type === 'perfect';
@@ -39,22 +41,38 @@ function MatchCard({ match, onPropose }: { match: Match; onPropose: (m: Match) =
     : 'text-orange-600 bg-orange-50 border-orange-200';
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-sm transition-all">
+    <div 
+      id={`match-${match.id}`}
+      className={`bg-card border rounded-xl p-5 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group/card ${highlight ? 'border-primary ring-2 ring-primary/20 bg-primary/5 shadow-md' : 'border-border'}`}
+      onClick={() => router.push(`/matches/${match.id}`)}
+    >
       <div className="flex items-start gap-4">
         {/* Avatar */}
-        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0 border-2 border-primary/20 transition-colors">
-          {u.avatarUrl
-            ? <img src={u.avatarUrl} alt={u.firstName} className="w-full h-full object-cover" />
-            : <span className="text-lg font-bold text-primary">{initials}</span>
-          }
-        </div>
+        <Link 
+          href={`/users/${u.id}`} 
+          className="relative z-20"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0 border-2 border-primary/20 hover:border-primary transition-colors">
+            {u.avatarUrl
+              ? <img src={u.avatarUrl} alt={u.firstName} className="w-full h-full object-cover" />
+              : <span className="text-lg font-bold text-primary">{initials}</span>
+            }
+          </div>
+        </Link>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-base font-semibold">
-              {u.firstName} {u.lastName}
-            </h3>
+            <Link 
+              href={`/users/${u.id}`}
+              className="relative z-20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-semibold hover:text-primary transition-colors">
+                {u.firstName} {u.lastName}
+              </h3>
+            </Link>
             {u.hasBadgeFiable && (
               <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">🏅 Fiable</span>
             )}
@@ -96,7 +114,10 @@ function MatchCard({ match, onPropose }: { match: Match; onPropose: (m: Match) =
           </span>
           <span className="text-xs text-muted-foreground">{match.label}</span>
           <button
-            onClick={() => onPropose(match)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPropose(match);
+            }}
             className={`mt-1 text-xs px-4 py-2 rounded-lg font-medium transition-all transform active:scale-95 ${
               isPerfect
                 ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/10'
@@ -114,6 +135,10 @@ function MatchCard({ match, onPropose }: { match: Match; onPropose: (m: Match) =
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MatchesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetId = searchParams.get('id');
+
   const [matches,   setMatches]   = useState<Match[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState<string | null>(null);
@@ -143,15 +168,33 @@ export default function MatchesPage() {
       .then((res) => {
         setMatches(res.data);
         setTotal(res.total);
+
+        // Redirect to detail page if ID is provided
+        if (targetId) {
+          router.push(`/matches/${targetId}`);
+        }
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [typeFilter, categoryFilter, sort, page]);
+  }, [typeFilter, categoryFilter, sort, page, targetId]);
 
   useEffect(() => { fetchMatches(); }, [fetchMatches]);
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [typeFilter, categoryFilter, sort]);
+
+  // Handle "propose" from public profile
+  useEffect(() => {
+    const proposeId = searchParams.get('propose');
+    if (proposeId) {
+      matchesApi.byUser(proposeId)
+        .then((m) => {
+          setSelectedMatch(m);
+          setIsModalOpen(true);
+        })
+        .catch(() => {});
+    }
+  }, [searchParams]);
 
   const handlePropose = (match: Match) => {
     setSelectedMatch(match);
@@ -268,7 +311,7 @@ export default function MatchesPage() {
                 <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{perfectMatches.length}</span>
               </div>
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {perfectMatches.map((m) => <MatchCard key={m.id} match={m} onPropose={handlePropose} />)}
+                {perfectMatches.map((m) => <MatchCard key={m.id} match={m} onPropose={handlePropose} highlight={m.id === targetId} />)}
               </div>
             </div>
           )}
@@ -281,7 +324,7 @@ export default function MatchesPage() {
                 <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{partialMatches.length}</span>
               </div>
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {partialMatches.map((m) => <MatchCard key={m.id} match={m} onPropose={handlePropose} />)}
+                {partialMatches.map((m) => <MatchCard key={m.id} match={m} onPropose={handlePropose} highlight={m.id === targetId} />)}
               </div>
             </div>
           )}

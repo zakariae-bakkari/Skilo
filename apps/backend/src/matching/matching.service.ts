@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MatchFilterDto } from './dto/match-filter.dto';
-import { MatchType, SkillLevel } from 'generated/prisma/client';
+import { MatchType, SkillLevel } from '@prisma/client';
 
 // ─── Level ordering for bonus calculation ─────────────────────────────────────
 // Used to check if the offered level is "one step above" the wanted level
@@ -271,10 +271,10 @@ export class MatchingService {
       });
 
       if (wasNotPerfect && isNowPerfect) {
-        await this.sendMatchUpgradeNotification(userAId, userBId);
+        await this.sendMatchUpgradeNotification(userAId, userBId, existing.id);
       }
     } else {
-      await this.prisma.match.create({
+      const newMatch = await this.prisma.match.create({
         data: {
           userAId: canonicalA,
           userBId: canonicalB,
@@ -287,7 +287,7 @@ export class MatchingService {
       });
 
       if (matchType === MatchType.perfect) {
-        await this.sendNewPerfectMatchNotification(userAId, userBId);
+        await this.sendNewPerfectMatchNotification(userAId, userBId, newMatch.id);
       }
     }
   }
@@ -534,6 +534,7 @@ export class MatchingService {
   private async sendNewPerfectMatchNotification(
     userAId: string,
     userBId: string,
+    matchId: string,
   ) {
     const userB = await this.prisma.user.findUnique({
       where: { id: userBId },
@@ -549,18 +550,18 @@ export class MatchingService {
         {
           userId: userAId,
           type: 'new_perfect_match',
-          payload: { fromUserFirstName: userB?.firstName },
+          payload: { fromUserFirstName: userB?.firstName, matchId },
         },
         {
           userId: userBId,
           type: 'new_perfect_match',
-          payload: { fromUserFirstName: userA?.firstName },
+          payload: { fromUserFirstName: userA?.firstName, matchId },
         },
       ],
     });
   }
 
-  private async sendMatchUpgradeNotification(userAId: string, userBId: string) {
+  private async sendMatchUpgradeNotification(userAId: string, userBId: string, matchId: string) {
     const userB = await this.prisma.user.findUnique({
       where: { id: userBId },
       select: { firstName: true },
@@ -575,14 +576,55 @@ export class MatchingService {
         {
           userId: userAId,
           type: 'match_upgraded',
-          payload: { fromUserFirstName: userB?.firstName },
+          payload: { fromUserFirstName: userB?.firstName, matchId },
         },
         {
           userId: userBId,
           type: 'match_upgraded',
-          payload: { fromUserFirstName: userA?.firstName },
+          payload: { fromUserFirstName: userA?.firstName, matchId },
         },
       ],
     });
+  }
+
+  async getMatchBetweenUsers(user1Id: string, user2Id: string) {
+    const [id1, id2] = [user1Id, user2Id].sort();
+
+    const match = await this.prisma.match.findUnique({
+      where: {
+        userAId_userBId: { userAId: id1, userBId: id2 },
+      },
+      include: {
+        userA: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            avgRating: true,
+            sessionsCompleted: true,
+            hasBadgeFiable: true,
+          },
+        },
+        userB: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            avgRating: true,
+            sessionsCompleted: true,
+            hasBadgeFiable: true,
+          },
+        },
+      },
+    });
+
+    if (!match) throw new NotFoundException('Match not found');
+
+    const otherUser = match.userAId === user1Id ? match.userB : match.userA;
+    const { userA, userB, ...rest } = match;
+
+    return { ...rest, otherUser };
   }
 }

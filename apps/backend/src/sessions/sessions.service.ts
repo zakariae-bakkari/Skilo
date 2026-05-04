@@ -11,10 +11,10 @@ import { ProposeSessionDto } from './dto/propose-session.dto';
 import { ConfirmSessionDto } from './dto/confirm-session.dto';
 import { DeclineCancelDto, SessionFilterDto } from './dto/session-filter.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { NotificationType } from 'generated/prisma/client';
+import { NotificationType } from '@prisma/client';
 
 // Shared select for the "other user" in a session card
-const SESSION_USER_SELECT = { id: true, firstName: true, lastName: true, avatarUrl: true };
+const SESSION_USER_SELECT = { id: true, firstName: true, lastName: true, avatarUrl: true, city: true, avgRating: true, sessionsCompleted: true };
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SESSION_SKILL_SELECT = { id: true, name: true, category: true };
@@ -346,9 +346,10 @@ export class SessionsService {
         'La session doit être confirmée avant de pouvoir valider sa tenue.',
       );
     }
-    if (session.scheduledAt > new Date()) {
-      throw new BadRequestException("La session n'a pas encore eu lieu.");
-    }
+    // Allow manual completion even if before scheduledAt (negotiated in chat)
+    // if (session.scheduledAt > new Date()) {
+    //   throw new BadRequestException("La session n'a pas encore eu lieu.");
+    // }
 
     const isInitiator = session.proposedById === userId;
     const isRecipient = session.recipientId === userId;

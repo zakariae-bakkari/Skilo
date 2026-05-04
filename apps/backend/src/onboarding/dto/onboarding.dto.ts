@@ -13,7 +13,7 @@ import {
   ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { SkillLevel } from 'generated/prisma/client';
+import { SkillLevel } from '@prisma/client';
 
 // ── One skill entry (offered or wanted) ───────────────────────────
 export class SkillEntryDto {

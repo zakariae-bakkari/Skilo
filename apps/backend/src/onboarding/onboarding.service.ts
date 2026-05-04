@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingDto } from './dto/onboarding.dto';
-import { SkillType } from 'generated/prisma/client';
+import { SkillType } from '@prisma/client';
 import { MatchingService } from '../matching/matching.service';
 
 @Injectable()

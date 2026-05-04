@@ -141,19 +141,23 @@ export default function ChatPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
         </Button>
-        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
-          {otherUser.avatarUrl ? (
-            <img src={otherUser.avatarUrl} alt={otherUser.firstName} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-lg font-bold text-primary">
-              {otherUser.firstName[0]}{otherUser.lastName[0]}
-            </span>
-          )}
-        </div>
+        <Link href={`/users/${otherUser.id}`} className="group/avatar shrink-0">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden border-2 border-primary/20 group-hover/avatar:border-primary transition-all">
+            {otherUser.avatarUrl ? (
+              <img src={otherUser.avatarUrl} alt={otherUser.firstName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-lg font-bold text-primary">
+                {otherUser.firstName[0]}{otherUser.lastName[0]}
+              </span>
+            )}
+          </div>
+        </Link>
         <div>
-          <h1 className="text-xl font-black">
-            {otherUser.firstName} {otherUser.lastName}
-          </h1>
+          <Link href={`/users/${otherUser.id}`}>
+            <h1 className="text-xl font-black hover:text-primary transition-colors">
+              {otherUser.firstName} {otherUser.lastName}
+            </h1>
+          </Link>
           <p className="text-xs font-semibold text-primary uppercase tracking-widest mt-1">
             Session {session.status === 'confirmed' ? 'Confirmée' : 'En attente'}
           </p>
@@ -177,13 +181,15 @@ export default function ChatPage() {
                 {!isMe && (
                   <div className="w-8 shrink-0 hidden sm:block">
                     {showAvatar && (
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                        {msg.sender.avatarUrl ? (
-                          <img src={msg.sender.avatarUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-xs font-bold">{msg.sender.firstName[0]}</span>
-                        )}
-                      </div>
+                      <Link href={`/users/${msg.senderId}`}>
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-primary transition-all">
+                          {msg.sender.avatarUrl ? (
+                            <img src={msg.sender.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-xs font-bold">{msg.sender.firstName[0]}</span>
+                          )}
+                        </div>
+                      </Link>
                     )}
                   </div>
                 )}

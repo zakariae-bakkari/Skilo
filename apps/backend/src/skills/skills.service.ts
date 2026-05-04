@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSkillDto } from './dto/create-skill.dto';
-import { SkillStatus } from 'generated/prisma/enums';
+import { SkillStatus } from '@prisma/client';
 
 @Injectable()
 export class SkillsService {
