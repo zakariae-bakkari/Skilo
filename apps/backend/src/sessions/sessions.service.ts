@@ -15,7 +15,15 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { NotificationType } from '@prisma/client';
 
 // Shared select for the "other user" in a session card
-const SESSION_USER_SELECT = { id: true, firstName: true, lastName: true, avatarUrl: true, city: true, avgRating: true, sessionsCompleted: true };
+const SESSION_USER_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  avatarUrl: true,
+  city: true,
+  avgRating: true,
+  sessionsCompleted: true,
+};
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SESSION_SKILL_SELECT = { id: true, name: true, category: true };
@@ -50,11 +58,15 @@ export class SessionsService {
       reservationTransactionId = tx.id;
     }
 
-    const offeredSkill = dto.offeredSkillId 
-      ? await this.prisma.skillCatalog.findUnique({ where: { id: dto.offeredSkillId } })
+    const offeredSkill = dto.offeredSkillId
+      ? await this.prisma.skillCatalog.findUnique({
+          where: { id: dto.offeredSkillId },
+        })
       : null;
-    const wantedSkill = dto.wantedSkillId 
-      ? await this.prisma.skillCatalog.findUnique({ where: { id: dto.wantedSkillId } })
+    const wantedSkill = dto.wantedSkillId
+      ? await this.prisma.skillCatalog.findUnique({
+          where: { id: dto.wantedSkillId },
+        })
       : null;
 
     const session = await this.prisma.session.create({
@@ -65,10 +77,10 @@ export class SessionsService {
         scheduledAt,
         durationMinutes: dto.duration,
         skillsExchanged: [
-          { 
-            offeredSkillName: offeredSkill?.name ?? 'Compétence', 
-            wantedSkillName: wantedSkill?.name ?? 'Compétence' 
-          }
+          {
+            offeredSkillName: offeredSkill?.name ?? 'Compétence',
+            wantedSkillName: wantedSkill?.name ?? 'Compétence',
+          },
         ],
         message: dto.message ?? null,
         meetingLink: dto.meetingLink ?? null,
@@ -109,9 +121,9 @@ export class SessionsService {
       initiatorId,
       session.id,
       'session_proposed',
-      { 
+      {
         scheduledAt: scheduledAt.toISOString(),
-        body: "Vous avez reçu une nouvelle demande de session d'échange." 
+        body: "Vous avez reçu une nouvelle demande de session d'échange.",
       },
     );
 
@@ -150,7 +162,7 @@ export class SessionsService {
 
     if (activeCount >= 3) {
       throw new ConflictException(
-        'Vous avez déjà 3 sessions actives avec cet utilisateur. Veuillez en terminer une avant d\'en proposer une nouvelle.',
+        "Vous avez déjà 3 sessions actives avec cet utilisateur. Veuillez en terminer une avant d'en proposer une nouvelle.",
       );
     }
   }
@@ -158,7 +170,9 @@ export class SessionsService {
   private readonly logger = new Logger(SessionsService.name);
 
   private async getActiveMatchOrThrow(userAId: string, userBId: string) {
-    this.logger.debug(`Searching active match between ${userAId} and ${userBId}`);
+    this.logger.debug(
+      `Searching active match between ${userAId} and ${userBId}`,
+    );
     const match = await this.prisma.match.findFirst({
       where: {
         status: 'active',
@@ -170,7 +184,9 @@ export class SessionsService {
     });
 
     if (!match) {
-      this.logger.warn(`No active match found for users ${userAId} and ${userBId}. Checking if match exists at all...`);
+      this.logger.warn(
+        `No active match found for users ${userAId} and ${userBId}. Checking if match exists at all...`,
+      );
       const anyMatch = await this.prisma.match.findFirst({
         where: {
           OR: [
@@ -180,9 +196,13 @@ export class SessionsService {
         },
       });
       if (anyMatch) {
-        this.logger.warn(`Found match ${anyMatch.id} but status is ${anyMatch.status}`);
+        this.logger.warn(
+          `Found match ${anyMatch.id} but status is ${anyMatch.status}`,
+        );
       } else {
-        this.logger.error(`No match record at all between ${userAId} and ${userBId}`);
+        this.logger.error(
+          `No match record at all between ${userAId} and ${userBId}`,
+        );
       }
 
       throw new BadRequestException(
@@ -247,9 +267,9 @@ export class SessionsService {
       recipientId,
       sessionId,
       'session_accepted',
-      { 
+      {
         scheduledAt: session.scheduledAt.toISOString(),
-        body: "Votre demande de session a été acceptée !"
+        body: 'Votre demande de session a été acceptée !',
       },
     );
 
@@ -285,9 +305,9 @@ export class SessionsService {
       recipientId,
       sessionId,
       'session_declined',
-      { 
+      {
         reason: dto.reason ?? null,
-        body: 'Votre demande de session a été déclinée.'
+        body: 'Votre demande de session a été déclinée.',
       },
     );
 
@@ -341,10 +361,10 @@ export class SessionsService {
       data: {
         userId: otherUserId,
         type: 'session_cancelled',
-        payload: { 
-          sessionId, 
+        payload: {
+          sessionId,
           reason: dto.reason ?? null,
-          body: 'Une session planifiée a été annulée.'
+          body: 'Une session planifiée a été annulée.',
         },
       },
     });
@@ -447,22 +467,24 @@ export class SessionsService {
     const now = new Date();
 
     const where: any = {
-      AND: [
-        { OR: [{ proposedById: userId }, { recipientId: userId }] }
-      ]
+      AND: [{ OR: [{ proposedById: userId }, { recipientId: userId }] }],
     };
 
     if (filters.tab === 'upcoming') {
       where.AND.push({
         scheduledAt: { gte: now },
-        status: { in: ['pending', 'confirmed'] }
+        status: { in: ['pending', 'confirmed'] },
       });
     } else {
       where.AND.push({
         OR: [
           { scheduledAt: { lt: now } },
-          { status: { in: ['completed', 'cancelled', 'disputed', 'auto_completed'] } }
-        ]
+          {
+            status: {
+              in: ['completed', 'cancelled', 'disputed', 'auto_completed'],
+            },
+          },
+        ],
       });
     }
 
@@ -555,14 +577,16 @@ export class SessionsService {
       data: { status: isAutoCompleted ? 'auto_completed' : 'completed' },
     });
 
-    const creditsEarned = CreditsService.creditsForDuration(
-      session.durationMinutes,
-    );
-    await this.creditsService.credit(
-      session.recipientId,
-      creditsEarned,
-      sessionId,
-    );
+    if (session.creditsUsed > 0) {
+      const creditsEarned = CreditsService.creditsForDuration(
+        session.durationMinutes,
+      );
+      await this.creditsService.credit(
+        session.recipientId,
+        creditsEarned,
+        sessionId,
+      );
+    }
 
     await this.prisma.user.updateMany({
       where: { id: { in: [session.proposedById, session.recipientId] } },
@@ -574,17 +598,17 @@ export class SessionsService {
         {
           userId: session.proposedById,
           type: 'session_completed',
-          payload: { 
+          payload: {
             sessionId,
-            body: "Votre session d'échange est maintenant terminée. N'oubliez pas de laisser un avis !"
+            body: "Votre session d'échange est maintenant terminée. N'oubliez pas de laisser un avis !",
           },
         },
         {
           userId: session.recipientId,
           type: 'session_completed',
-          payload: { 
+          payload: {
             sessionId,
-            body: "Votre session d'échange est maintenant terminée. N'oubliez pas de laisser un avis !"
+            body: "Votre session d'échange est maintenant terminée. N'oubliez pas de laisser un avis !",
           },
         },
       ],
@@ -616,7 +640,7 @@ export class SessionsService {
   // ══════════════════════════════════════════════════════════════════════════
   async getMessages(sessionId: string, userId: string) {
     const session = await this.findSessionOrThrow(sessionId);
-    
+
     if (session.proposedById !== userId && session.recipientId !== userId) {
       throw new ForbiddenException();
     }
@@ -631,9 +655,9 @@ export class SessionsService {
             firstName: true,
             lastName: true,
             avatarUrl: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     return messages;
@@ -642,7 +666,11 @@ export class SessionsService {
   // ══════════════════════════════════════════════════════════════════════════
   // POST /sessions/:id/messages
   // ══════════════════════════════════════════════════════════════════════════
-  async createMessage(sessionId: string, userId: string, dto: CreateMessageDto) {
+  async createMessage(
+    sessionId: string,
+    userId: string,
+    dto: CreateMessageDto,
+  ) {
     const session = await this.findSessionOrThrow(sessionId);
 
     if (session.proposedById !== userId && session.recipientId !== userId) {
@@ -650,7 +678,9 @@ export class SessionsService {
     }
 
     if (!['pending', 'confirmed'].includes(session.status)) {
-      throw new BadRequestException('Vous ne pouvez envoyer des messages que dans les sessions en attente ou confirmées.');
+      throw new BadRequestException(
+        'Vous ne pouvez envoyer des messages que dans les sessions en attente ou confirmées.',
+      );
     }
 
     const message = await this.prisma.message.create({
@@ -668,9 +698,9 @@ export class SessionsService {
             firstName: true,
             lastName: true,
             avatarUrl: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     return message;

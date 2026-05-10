@@ -9,7 +9,6 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AddSkillDto, UpdateSkillLevelDto } from './dto/skill.dto';
 import { SkillType } from '@prisma/client';
 import { MatchingService } from '../matching/matching.service';
-
 // Fields to select from the user
 const USER_PUBLIC_SELECT = {
   id: true,
@@ -43,9 +42,9 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly matchingService: MatchingService,
-  ) { }
+  ) {}
 
-  // ─── GET /users/me
+  //  GET /users/me
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -66,7 +65,7 @@ export class UsersService {
     };
   }
 
-  // ─── PATCH /users/me
+  //  PATCH /users/me
   async updateMe(userId: string, dto: UpdateProfileDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
@@ -126,7 +125,7 @@ export class UsersService {
     };
   }
 
-  // ─── DELETE /users/me (soft delete) ──────────────────────────────────────
+  //  DELETE /users/me (soft delete)
   async deleteMe(userId: string) {
     await this.prisma.user.update({
       where: { id: userId },
@@ -135,7 +134,7 @@ export class UsersService {
     return { message: 'Votre compte a été désactivé.' };
   }
 
-  // ─── GET /users/:id (public profile) ─────────────────────────────────────
+  //  GET /users/:id (public profile)
   async getPublicProfile(targetId: string, currentUserId: string) {
     const target = await this.prisma.user.findUnique({
       where: { id: targetId },
@@ -201,7 +200,7 @@ export class UsersService {
     };
   }
 
-  // ─── GET /users (list, paginated) ────────────────────────────────────────
+  //  GET /users (list, paginated)
   async listUsers(page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
 
@@ -225,9 +224,9 @@ export class UsersService {
     };
   }
 
-  // ─── POST /users/me/skills ────────────────────────────────────────────────
+  //  POST /users/me/skills
   async addSkill(userId: string, dto: AddSkillDto) {
-    // Check 5-skill limit per type
+    // verifier si l'utilisateur avoir deja 5 skills
     const count = await this.prisma.userSkill.count({
       where: { userId, type: dto.type },
     });
@@ -237,7 +236,7 @@ export class UsersService {
       );
     }
 
-    // verify skill exists in catalog
+    // verfier si skill exist
     const skill = await this.prisma.skillCatalog.findFirst({
       where: {
         id: dto.skillId,
@@ -246,7 +245,7 @@ export class UsersService {
     });
     if (!skill) throw new NotFoundException('Skill not found in catalog');
 
-    // Check not already added (any type — FC-02-C: a skill cannot be both offered and wanted)
+    // verfier si l'utilisateur a deja cette skill dans son profil
     const alreadyHas = await this.prisma.userSkill.findFirst({
       where: { userId, skillCatalogId: dto.skillId },
     });
@@ -271,7 +270,7 @@ export class UsersService {
       },
     });
 
-    // Increment usageCount on the catalog skill (for autocomplete ranking)
+    // incrementer usecount de la skill dans skillcatalog
     await this.prisma.skillCatalog.update({
       where: { id: dto.skillId },
       data: { usageCount: { increment: 1 } },
@@ -282,7 +281,7 @@ export class UsersService {
     return { message: 'Compétence ajoutée.', skill: userSkill };
   }
 
-  // ─── PATCH /users/me/skills/:userSkillId ─────────────────────────────────
+  //  PATCH /users/me/skills/:userSkillId
   async updateSkillLevel(
     userId: string,
     userSkillId: string,
@@ -311,7 +310,7 @@ export class UsersService {
     return { message: 'Niveau mis à jour.', skill: updated };
   }
 
-  // ─── DELETE /users/me/skills/:userSkillId ────────────────────────────────
+  //  DELETE /users/me/skills/:userSkillId
   async removeSkill(userId: string, userSkillId: string) {
     const userSkill = await this.prisma.userSkill.findUnique({
       where: { id: userSkillId },
@@ -353,7 +352,7 @@ export class UsersService {
     return { message: 'Compétence supprimée.' };
   }
 
-  // ─── Profile strength (FC-02-04) 
+  //  Profile strength (FC-02-04)
   // Called internally — not exposed as a route
   calculateStrength(user: {
     avatarUrl?: string | null;
@@ -405,7 +404,7 @@ export class UsersService {
     return { score, label, nextAction };
   }
 
-  // ─── Private: resolve action button for public profile
+  //  Private: resolve action button for public profile
   private async resolveActionButton(currentUserId: string, targetId: string) {
     // Check if there's an active session between the two
     const activeSession = await this.prisma.session.findFirst({
