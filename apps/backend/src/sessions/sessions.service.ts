@@ -14,7 +14,7 @@ import { DeclineCancelDto, SessionFilterDto } from './dto/session-filter.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { NotificationType } from '@prisma/client';
 
-// Shared select for the "other user" in a session card
+// selection des infos de l'autre utilisateur pour les cartes de session
 const SESSION_USER_SELECT = {
   id: true,
   firstName: true,
@@ -97,7 +97,7 @@ export class SessionsService {
       },
     });
 
-    // Generate meeting link if not provided
+    // on genere un lien si besoin
     if (!session.meetingLink) {
       const generatedLink = `https://meet.ffmuc.net/skilo-${session.id}`;
       await this.prisma.session.update({
@@ -270,11 +270,13 @@ export class SessionsService {
     return { message: 'Session acceptee.' };
   }
 
-    // PATCH /sessions/:id/decline
-    async decline(sessionId: string, recipientId: string, dto: DeclineCancelDto) {
+  // PATCH /sessions/:id/decline
+  async decline(sessionId: string, userId: string, dto: DeclineCancelDto) {
     const session = await this.findSessionOrThrow(sessionId);
 
-    if (session.recipientId !== recipientId) throw new ForbiddenException();
+    const isParticipant =
+      session.proposedById === userId || session.recipientId === userId;
+    if (!isParticipant) throw new ForbiddenException();
     if (session.status !== 'pending') {
       throw new BadRequestException('Cette session ne peut plus etre refusee.');
     }
@@ -294,7 +296,7 @@ export class SessionsService {
 
     await this.notifyUser(
       session.proposedById,
-      recipientId,
+      userId,
       sessionId,
       'session_declined',
       {
@@ -306,8 +308,8 @@ export class SessionsService {
     return { message: 'Session refusee.' };
   }
 
-    // PATCH /sessions/:id/cancel
-    async cancel(sessionId: string, userId: string, dto: DeclineCancelDto) {
+  // PATCH /sessions/:id/cancel
+  async cancel(sessionId: string, userId: string, dto: DeclineCancelDto) {
     const session = await this.findSessionOrThrow(sessionId);
 
     const isParticipant =
@@ -367,19 +369,15 @@ export class SessionsService {
     };
   }
 
-    // PATCH /sessions/:id/confirm — both users confirm if it happened
-    async confirm(sessionId: string, userId: string, dto: ConfirmSessionDto) {
+  // PATCH /sessions/:id/confirm
+  async confirm(sessionId: string, userId: string, dto: ConfirmSessionDto) {
     const session = await this.findSessionOrThrow(sessionId);
 
     if (session.status !== 'confirmed') {
       throw new BadRequestException(
-        'La session doit être confirmée avant de pouvoir valider sa tenue.',
+        'La session doit etre confirmee avant de pouvoir valider sa tenue.',
       );
     }
-    // Allow manual completion even if before scheduledAt (negotiated in chat)
-    // if (session.scheduledAt > new Date()) {
-    //   throw new BadRequestException("La session n'a pas encore eu lieu.");
-    // }
 
     const isInitiator = session.proposedById === userId;
     const isRecipient = session.recipientId === userId;
@@ -445,8 +443,8 @@ export class SessionsService {
     return { message: 'Confirmation enregistree.' };
   }
 
-    // GET /sessions
-    async getMySessions(userId: string, filters: SessionFilterDto) {
+  // GET /sessions
+  async getMySessions(userId: string, filters: SessionFilterDto) {
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -501,7 +499,6 @@ export class SessionsService {
 
     const shaped = sessions.map((s) => ({
       ...s,
-      // Keep proposedBy and recipient for the frontend
       proposedBy: s.proposedBy,
       recipient: s.recipient,
     }));
@@ -512,8 +509,8 @@ export class SessionsService {
     };
   }
 
-    // GET /sessions/:id
-    async getSessionById(sessionId: string, userId: string) {
+  // GET /sessions/:id
+  async findOne(sessionId: string, userId: string) {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
       select: {
@@ -534,7 +531,7 @@ export class SessionsService {
       },
     });
 
-    if (!session) throw new NotFoundException('Session not found');
+    if (!session) throw new NotFoundException('Session non trouvee');
 
     const isParticipant =
       session.proposedBy.id === userId || session.recipient.id === userId;
@@ -543,8 +540,7 @@ export class SessionsService {
     return session;
   }
 
-    // INTERNAL — completeSession (called from confirm + cron jobs)
-    async completeSession(
+  async completeSession(
     sessionId: string,
     session: {
       proposedById: string;
@@ -582,7 +578,7 @@ export class SessionsService {
           type: 'session_completed',
           payload: {
             sessionId,
-            body: "Votre session d'échange est maintenant terminée. N'oubliez pas de laisser un avis !",
+            body: "Votre session d'echange est maintenant terminee. N'oubliez pas de laisser un avis !",
           },
         },
         {
@@ -590,14 +586,13 @@ export class SessionsService {
           type: 'session_completed',
           payload: {
             sessionId,
-            body: "Votre session d'échange est maintenant terminée. N'oubliez pas de laisser un avis !",
+            body: "Votre session d'echange est maintenant terminee. N'oubliez pas de laisser un avis !",
           },
         },
       ],
     });
   }
 
-  // ─── Private helper ───────────────────────────────────────────────────────
   private async findSessionOrThrow(sessionId: string) {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
@@ -613,12 +608,12 @@ export class SessionsService {
         confirmedByB: true,
       },
     });
-    if (!session) throw new NotFoundException('Session not found');
+    if (!session) throw new NotFoundException('session non trouvee');
     return session;
   }
 
-    // GET /sessions/:id/messages
-    async getMessages(sessionId: string, userId: string) {
+  // GET /sessions/:id/messages
+  async getMessages(sessionId: string, userId: string) {
     const session = await this.findSessionOrThrow(sessionId);
 
     if (session.proposedById !== userId && session.recipientId !== userId) {
@@ -643,8 +638,8 @@ export class SessionsService {
     return messages;
   }
 
-    // POST /sessions/:id/messages
-    async createMessage(
+  // POST /sessions/:id/messages
+  async createMessage(
     sessionId: string,
     userId: string,
     dto: CreateMessageDto,
@@ -657,7 +652,7 @@ export class SessionsService {
 
     if (!['pending', 'confirmed'].includes(session.status)) {
       throw new BadRequestException(
-        'Vous ne pouvez envoyer des messages que dans les sessions en attente ou confirmées.',
+        'Vous ne pouvez envoyer des messages que dans les sessions en attente ou confirmees.',
       );
     }
 

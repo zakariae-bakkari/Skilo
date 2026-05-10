@@ -10,10 +10,10 @@ import { CreditsModule } from '../credits/credits.module';
 @Module({
   imports: [
     AuthModule,
-    CreditsModule, // SessionsService needs CreditsService
+    CreditsModule, 
   ],
   controllers: [SessionsController],
   providers: [SessionsService, SessionsGateway, SessionsJob, PrismaService],
-  exports: [SessionsService], // ReviewsModule needs completeSession
+  exports: [SessionsService], 
 })
 export class SessionsModule {}
