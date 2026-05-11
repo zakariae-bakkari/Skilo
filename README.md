@@ -20,7 +20,7 @@ Ce projet a été conçu et développé avec passion par :
 ## 🌐 Liens de Déploiement
 
 - **Frontend** : [skilo-frontend-five.vercel.app](https://skilo-frontend-five.vercel.app/)
-- **Backend (API)** : [skilo-backend-sigma.vercel.app](https://skilo-backend-sigma.vercel.app/)
+- **Backend (API) ** : [skilo-backend-sigma.vercel.app](https://skilo-backend-sigma.vercel.app/)
 
 ---
 
