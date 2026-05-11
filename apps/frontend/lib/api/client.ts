@@ -3,6 +3,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 let _accessToken: string | null = null;
 
+let refreshPromise: Promise<boolean> | null = null;
+
 export function setAccessToken(token: string | null) {
   _accessToken = token;
 }
@@ -38,7 +40,13 @@ export async function request<T>(
   });
 
   if (res.status === 401 && path !== '/auth/refresh' && path !== '/auth/login') {
-    const refreshed = await tryRefresh();
+    if (!refreshPromise) {
+  refreshPromise = tryRefresh().finally(() => {
+    refreshPromise = null;
+  });
+}
+
+const refreshed = await refreshPromise;
     if (refreshed) {
       return request<T>(method, path, body, isFormData);
     }
