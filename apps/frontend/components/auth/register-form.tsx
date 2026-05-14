@@ -87,7 +87,7 @@ export function RegisterForm() {
               <Label htmlFor="register-firstName">Prénom</Label>
               <Input
                 id="register-firstName"
-                placeholder=""
+                placeholder="hamri"
                 autoComplete="given-name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -100,7 +100,7 @@ export function RegisterForm() {
               <Label htmlFor="register-lastName">Nom</Label>
               <Input
                 id="register-lastName"
-                placeholder=""
+                placeholder="meriem"
                 autoComplete="family-name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
