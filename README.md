@@ -5,9 +5,7 @@
 ---
 
 ## 📸 Aperçu
-![Skilo Dashboard Mockup](https://raw.githubusercontent.com/zakariaebakkari/Skilo/main/screenshot.png)
-*(Ajoutez votre capture d'écran ici en remplaçant le lien ci-dessus)*
-
+![alt text](image.png)
 ---
 
 ## 👥 L'Équipe
@@ -20,7 +18,7 @@ Ce projet a été conçu et développé avec passion par :
 ## 🌐 Liens de Déploiement
 
 - **Frontend** : [skilo-frontend-five.vercel.app](https://skilo-frontend-five.vercel.app/)
-- **Backend (API) ** : [skilo-backend-sigma.vercel.app](https://skilo-backend-sigma.vercel.app/)
+- **Backend (API)** : [skilo-backend-sigma.vercel.app](https://skilo-backend-sigma.vercel.app/)
 
 ---
 
