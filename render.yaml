@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: nestjs
+    runtime: node
+    rootDir: apps/backend
+    buildCommand: pnpm install && pnpm --filter backend build
+    startCommand: pnpm --filter backend start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
