@@ -1,4 +1,4 @@
-# 🚀 Skilo — Échangez vos compétences
+# Skilo — Échangez vos compétences
 
 **Skilo** est une plateforme d'apprentissage collaboratif innovante basée sur l'échange de temps et de savoirs. Le concept est simple : enseignez ce que vous maîtrisez pour gagner des crédits, et utilisez ces crédits pour apprendre de nouvelles compétences auprès d'autres passionnés.
 
@@ -9,32 +9,32 @@
 ![alt text](image.png)
 ---
 
-## 👥 L'Équipe
+## L'Équipe
 Ce projet a été conçu et développé avec passion par :
 - **Zakariae Bakkari** ([@zakariaebakkari](https://github.com/zakariaebakkari))
 - **Meriem Hamri** ([@Meriem-9-9](https://github.com/Meriem-9-9))
 
 ---
 
-## 🌐 Liens de Déploiement
+## Liens de Déploiement
 
 - **Frontend** : [skilo-frontend-five.vercel.app](https://skilo-frontend-five.vercel.app/)
 - **Backend (API)** : [skilo-backend-sigma.vercel.app](https://skilo-backend-sigma.vercel.app/)
 
 ---
 
-## ✨ Fonctionnalités Clés
+## Fonctionnalités Clés
 
-- **🎯 Matching Intelligent** : Un algorithme qui analyse vos compétences offertes et recherchées pour vous proposer des "Matchs Parfaits" (échange réciproque gratuit) ou des "Matchs Partiels" (échange contre crédits).
-- **⏳ Économie de Crédits Temps** : Système basé sur l'équité où **1 session = 1 crédit**. Un système de balance équilibrée assure une circulation fluide des connaissances.
-- **📅 Gestion des Sessions** : Interface complète pour proposer, accepter et suivre vos sessions d'échange. Intégration automatique de liens de réunion vidéo.
-- **💬 Messagerie Intégrée** : Chat en temps réel avec WebSockets pour discuter et organiser vos échanges avec vos partenaires.
-- **🎁 Système de Parrainage** : Invitez vos amis et recevez des crédits bonus pour booster votre apprentissage dès leur inscription.
-- **💎 Design Premium** : Une interface moderne, sombre et épurée (Glassmorphism), optimisée pour une expérience utilisateur fluide sur tous les supports.
+- **Matching Intelligent** : Un algorithme qui analyse vos compétences offertes et recherchées pour vous proposer des "Matchs Parfaits" (échange réciproque gratuit) ou des "Matchs Partiels" (échange contre crédits).
+- **Économie de Crédits Temps** : Système basé sur l'équité où **1 session = 1 crédit**. Un système de balance équilibrée assure une circulation fluide des connaissances.
+- **Gestion des Sessions** : Interface complète pour proposer, accepter et suivre vos sessions d'échange. Intégration automatique de liens de réunion vidéo.
+- **Messagerie Intégrée** : Chat en temps réel avec WebSockets pour discuter et organiser vos échanges avec vos partenaires.
+- **Système de Parrainage** : Invitez vos amis et recevez des crédits bonus pour booster votre apprentissage dès leur inscription.
+- **Design Premium** : Une interface moderne, sombre et épurée (Glassmorphism), optimisée pour une expérience utilisateur fluide sur tous les supports.
 
 ---
 
-## 🛠️ Stack Technique
+## Stack Technique
 
 ### Architecture Monorepo ([Turborepo](https://turbo.build/))
 - **Frontend** : [Next.js 16](https://nextjs.org/) (App Router), TypeScript, Tailwind CSS, Lucide React, Framer Motion.
@@ -45,7 +45,7 @@ Ce projet a été conçu et développé avec passion par :
 
 ---
 
-## 🚀 Démarrage Rapide
+## Démarrage Rapide
 
 ### 1. Prérequis
 - [Node.js](https://nodejs.org/) (v18+)
@@ -72,5 +72,5 @@ L'application sera accessible sur `http://localhost:2004` (Frontend) et l'API su
 
 ---
 
-## 📝 Licence
+## Licence
 Projet développé par Zakariae Bakkari et Meriem Hamri. Tous droits réservés.
